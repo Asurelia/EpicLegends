@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -14,6 +15,17 @@ public class HealthTests
     {
         _testObject = new GameObject("TestObject");
         _health = _testObject.AddComponent<Health>();
+
+        // Initialiser les SerializeFields manuellement car Unity ne le fait pas en EditMode
+        SetPrivateField(_health, "_maxHealth", 100f);
+        SetPrivateField(_health, "_currentHealth", 100f);
+        SetPrivateField(_health, "_destroyOnDeath", false);
+    }
+
+    private void SetPrivateField(object obj, string fieldName, object value)
+    {
+        var field = obj.GetType().GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
+        field?.SetValue(obj, value);
     }
 
     [TearDown]
@@ -29,7 +41,7 @@ public class HealthTests
         float initialHealth = _health.CurrentHealth;
 
         // Act
-        _health.TakeDamage(10f);
+        _health.TakeDamage(10f, DamageType.Physical);
 
         // Assert
         Assert.Less(_health.CurrentHealth, initialHealth);
@@ -42,7 +54,7 @@ public class HealthTests
         float damage = _health.MaxHealth + 10f;
 
         // Act
-        _health.TakeDamage(damage);
+        _health.TakeDamage(damage, DamageType.Physical);
 
         // Assert
         Assert.IsTrue(_health.IsDead);
@@ -53,7 +65,7 @@ public class HealthTests
     public void Heal_RestoresHealth()
     {
         // Arrange
-        _health.TakeDamage(50f);
+        _health.TakeDamage(50f, DamageType.Physical);
         float damagedHealth = _health.CurrentHealth;
 
         // Act
@@ -80,11 +92,11 @@ public class HealthTests
     public void TakeDamage_WhenDead_DoesNothing()
     {
         // Arrange
-        _health.TakeDamage(_health.MaxHealth); // Kill
+        _health.TakeDamage(_health.MaxHealth, DamageType.Physical); // Kill
         Assert.IsTrue(_health.IsDead);
 
         // Act
-        _health.TakeDamage(100f); // Try to damage again
+        _health.TakeDamage(100f, DamageType.Physical); // Try to damage again
 
         // Assert
         Assert.AreEqual(0, _health.CurrentHealth); // Still 0
@@ -94,7 +106,7 @@ public class HealthTests
     public void ResetHealth_RestoresToMax()
     {
         // Arrange
-        _health.TakeDamage(50f);
+        _health.TakeDamage(50f, DamageType.Physical);
 
         // Act
         _health.ResetHealth();
@@ -110,7 +122,7 @@ public class HealthTests
         float maxHealth = _health.MaxHealth;
 
         // Act
-        _health.TakeDamage(maxHealth / 2); // 50% damage
+        _health.TakeDamage(maxHealth / 2, DamageType.Physical); // 50% damage
 
         // Assert
         Assert.AreEqual(0.5f, _health.HealthPercent, 0.01f);
