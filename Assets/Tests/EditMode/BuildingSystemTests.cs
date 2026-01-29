@@ -384,4 +384,293 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region StorageBuilding Tests
+
+    [Test]
+    public void StorageBuilding_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Storage");
+        var storage = go.AddComponent<StorageBuilding>();
+
+        // Assert
+        Assert.IsNotNull(storage);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void StorageBuilding_CanAddResource()
+    {
+        // Arrange
+        var go = new GameObject("Storage");
+        var storage = go.AddComponent<StorageBuilding>();
+        storage.Configure(10, 100);
+
+        // Appeler Awake
+        var awakeMethod = typeof(StorageBuilding).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(storage, null);
+
+        // Act
+        bool added = storage.AddResource(ResourceType.Wood, 50);
+
+        // Assert
+        Assert.IsTrue(added);
+        Assert.AreEqual(50, storage.GetResourceCount(ResourceType.Wood));
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void StorageBuilding_CanRemoveResource()
+    {
+        // Arrange
+        var go = new GameObject("Storage");
+        var storage = go.AddComponent<StorageBuilding>();
+        storage.Configure(10, 100);
+
+        var awakeMethod = typeof(StorageBuilding).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(storage, null);
+
+        storage.AddResource(ResourceType.Stone, 30);
+
+        // Act
+        bool removed = storage.RemoveResource(ResourceType.Stone, 10);
+
+        // Assert
+        Assert.IsTrue(removed);
+        Assert.AreEqual(20, storage.GetResourceCount(ResourceType.Stone));
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void StorageBuilding_RejectsOverCapacity()
+    {
+        // Arrange
+        var go = new GameObject("Storage");
+        var storage = go.AddComponent<StorageBuilding>();
+        storage.Configure(1, 50);
+
+        var awakeMethod = typeof(StorageBuilding).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(storage, null);
+
+        // Act
+        bool added = storage.AddResource(ResourceType.Wood, 100);
+
+        // Assert
+        Assert.IsFalse(added);
+        Assert.AreEqual(0, storage.GetResourceCount(ResourceType.Wood));
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
+
+    #region ProductionBuilding Tests
+
+    [Test]
+    public void ProductionBuilding_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Production");
+        var production = go.AddComponent<ProductionBuilding>();
+
+        // Assert
+        Assert.IsNotNull(production);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ProductionBuilding_CanConfigure()
+    {
+        // Arrange
+        var go = new GameObject("Production");
+        var production = go.AddComponent<ProductionBuilding>();
+
+        // Act
+        production.Configure(BuildingSubCategory.Furnace, 2, 10);
+
+        // Assert
+        Assert.AreEqual(BuildingSubCategory.Furnace, production.StationType);
+        Assert.AreEqual(2, production.StationLevel);
+        Assert.AreEqual(10, production.QueueSize);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ProductionBuilding_CanQueueRecipe()
+    {
+        // Arrange
+        var go = new GameObject("Production");
+        var production = go.AddComponent<ProductionBuilding>();
+        production.Configure(BuildingSubCategory.Workbench, 1, 5);
+
+        var awakeMethod = typeof(ProductionBuilding).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(production, null);
+
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+        recipe.requiredStation = BuildingSubCategory.Workbench;
+        recipe.requiredStationLevel = 1;
+
+        // Act
+        bool queued = production.QueueRecipe(recipe);
+
+        // Assert
+        Assert.IsTrue(queued);
+        Assert.AreEqual(1, production.QueueCount);
+
+        // Cleanup
+        Object.DestroyImmediate(recipe);
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
+
+    #region DefenseTower Tests
+
+    [Test]
+    public void DefenseTower_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Tower");
+        var tower = go.AddComponent<DefenseTower>();
+
+        // Assert
+        Assert.IsNotNull(tower);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void DefenseTower_CanConfigure()
+    {
+        // Arrange
+        var go = new GameObject("Tower");
+        var tower = go.AddComponent<DefenseTower>();
+
+        // Act
+        tower.Configure(TowerType.Cannon, 15f, 50f, 0.5f);
+
+        // Assert
+        Assert.AreEqual(TowerType.Cannon, tower.TowerType);
+        Assert.AreEqual(15f, tower.Range);
+        Assert.AreEqual(50f, tower.Damage);
+        Assert.AreEqual(0.5f, tower.FireRate);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void DefenseTower_CanSetTargetingMode()
+    {
+        // Arrange
+        var go = new GameObject("Tower");
+        var tower = go.AddComponent<DefenseTower>();
+
+        // Act
+        tower.SetTargetingMode(TargetingMode.LowestHealth);
+
+        // Assert - pas d'exception = succes
+        Assert.IsTrue(true);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void TowerType_HasAllTypes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(TowerType), "Arrow"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(TowerType), "Cannon"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(TowerType), "Magic"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(TowerType), "Frost"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(TowerType), "Lightning"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(TowerType), "Support"));
+    }
+
+    #endregion
+
+    #region PowerGenerator Tests
+
+    [Test]
+    public void PowerGenerator_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Generator");
+        var generator = go.AddComponent<PowerGenerator>();
+
+        // Assert
+        Assert.IsNotNull(generator);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void PowerGenerator_CanConfigure()
+    {
+        // Arrange
+        var go = new GameObject("Generator");
+        var generator = go.AddComponent<PowerGenerator>();
+
+        // Act
+        generator.Configure(200f, 20f, GeneratorType.Solar);
+
+        // Assert
+        Assert.AreEqual(200f, generator.PowerOutput);
+        Assert.AreEqual(20f, generator.Range);
+        Assert.AreEqual(GeneratorType.Solar, generator.GeneratorType);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void GeneratorType_HasAllTypes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(GeneratorType), "Manual"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(GeneratorType), "Fuel"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(GeneratorType), "Solar"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(GeneratorType), "Wind"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(GeneratorType), "Geothermal"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(GeneratorType), "Reactor"));
+    }
+
+    #endregion
+
+    #region Projectile Tests
+
+    [Test]
+    public void Projectile_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Projectile");
+        var projectile = go.AddComponent<Projectile>();
+
+        // Assert
+        Assert.IsNotNull(projectile);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
 }
