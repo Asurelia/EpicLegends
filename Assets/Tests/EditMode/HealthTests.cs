@@ -3,7 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// Unit tests for the Health component.
+/// Tests unitaires pour le composant Health.
 /// </summary>
 public class HealthTests
 {
@@ -19,6 +19,7 @@ public class HealthTests
         // Initialiser les SerializeFields manuellement car Unity ne le fait pas en EditMode
         SetPrivateField(_health, "_maxHealth", 100f);
         SetPrivateField(_health, "_currentHealth", 100f);
+        SetPrivateField(_health, "_defense", 0f);
         SetPrivateField(_health, "_destroyOnDeath", false);
     }
 
@@ -26,6 +27,15 @@ public class HealthTests
     {
         var field = obj.GetType().GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
         field?.SetValue(obj, value);
+    }
+
+    private DamageInfo CreateDamage(float amount, DamageType type = DamageType.Physical)
+    {
+        return new DamageInfo
+        {
+            baseDamage = amount,
+            damageType = type
+        };
     }
 
     [TearDown]
@@ -41,7 +51,7 @@ public class HealthTests
         float initialHealth = _health.CurrentHealth;
 
         // Act
-        _health.TakeDamage(10f, DamageType.Physical);
+        _health.TakeDamage(CreateDamage(10f));
 
         // Assert
         Assert.Less(_health.CurrentHealth, initialHealth);
@@ -50,11 +60,11 @@ public class HealthTests
     [Test]
     public void TakeDamage_WhenHealthReachesZero_IsDead()
     {
-        // Arrange - damage more than max health
+        // Arrange - degats superieurs a la vie max
         float damage = _health.MaxHealth + 10f;
 
         // Act
-        _health.TakeDamage(damage, DamageType.Physical);
+        _health.TakeDamage(CreateDamage(damage));
 
         // Assert
         Assert.IsTrue(_health.IsDead);
@@ -65,7 +75,7 @@ public class HealthTests
     public void Heal_RestoresHealth()
     {
         // Arrange
-        _health.TakeDamage(50f, DamageType.Physical);
+        _health.TakeDamage(CreateDamage(50f));
         float damagedHealth = _health.CurrentHealth;
 
         // Act
@@ -92,21 +102,21 @@ public class HealthTests
     public void TakeDamage_WhenDead_DoesNothing()
     {
         // Arrange
-        _health.TakeDamage(_health.MaxHealth, DamageType.Physical); // Kill
+        _health.TakeDamage(CreateDamage(_health.MaxHealth)); // Tuer
         Assert.IsTrue(_health.IsDead);
 
         // Act
-        _health.TakeDamage(100f, DamageType.Physical); // Try to damage again
+        _health.TakeDamage(CreateDamage(100f)); // Essayer de faire des degats
 
         // Assert
-        Assert.AreEqual(0, _health.CurrentHealth); // Still 0
+        Assert.AreEqual(0, _health.CurrentHealth); // Toujours 0
     }
 
     [Test]
     public void ResetHealth_RestoresToMax()
     {
         // Arrange
-        _health.TakeDamage(50f, DamageType.Physical);
+        _health.TakeDamage(CreateDamage(50f));
 
         // Act
         _health.ResetHealth();
@@ -122,9 +132,40 @@ public class HealthTests
         float maxHealth = _health.MaxHealth;
 
         // Act
-        _health.TakeDamage(maxHealth / 2, DamageType.Physical); // 50% damage
+        _health.TakeDamage(CreateDamage(maxHealth / 2)); // 50% degats
 
         // Assert
         Assert.AreEqual(0.5f, _health.HealthPercent, 0.01f);
+    }
+
+    [Test]
+    public void TakeDamage_WithDamageInfo_AppliesCorrectDamage()
+    {
+        // Arrange
+        var damageInfo = new DamageInfo
+        {
+            baseDamage = 25f,
+            damageType = DamageType.Fire
+        };
+
+        // Act
+        _health.TakeDamage(damageInfo);
+
+        // Assert
+        Assert.Less(_health.CurrentHealth, _health.MaxHealth);
+    }
+
+    [Test]
+    public void TakeDamage_TrueDamage_IgnoresResistances()
+    {
+        // Arrange
+        SetPrivateField(_health, "_physicalResistance", 0.5f);
+        var trueDamage = CreateDamage(50f, DamageType.True);
+
+        // Act
+        _health.TakeDamage(trueDamage);
+
+        // Assert - degats purs font 50 degats minimum
+        Assert.LessOrEqual(_health.CurrentHealth, 50f);
     }
 }

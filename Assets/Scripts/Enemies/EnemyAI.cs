@@ -225,10 +225,19 @@ public class EnemyAI : MonoBehaviour
         float distance = Vector3.Distance(transform.position, _player.position);
         if (distance > _attackRange) return;
 
-        // Try to damage player
+        // Creer les infos de degats
+        var damageInfo = new DamageInfo
+        {
+            baseDamage = _attackDamage,
+            damageType = _damageType,
+            attacker = gameObject,
+            hitPoint = _player.position
+        };
+
+        // Appliquer les degats au joueur
         if (_player.TryGetComponent<IDamageable>(out var damageable))
         {
-            damageable.TakeDamage(_attackDamage, _damageType);
+            damageable.TakeDamage(damageInfo);
             Debug.Log($"{gameObject.name} attacked player for {_attackDamage} damage!");
         }
         else if (_player.TryGetComponent<PlayerStats>(out var stats))

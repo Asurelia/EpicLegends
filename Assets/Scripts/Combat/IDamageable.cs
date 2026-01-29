@@ -1,33 +1,17 @@
 /// <summary>
-/// Interface for any entity that can take damage.
-/// Implement this on players, enemies, destructible objects, etc.
+/// Interface pour toute entite qui peut recevoir des degats.
+/// A implementer sur les joueurs, ennemis, objets destructibles, etc.
 /// </summary>
 public interface IDamageable
 {
     /// <summary>
-    /// Apply damage to this entity.
+    /// Applique des degats a cette entite.
     /// </summary>
-    /// <param name="amount">Amount of damage to apply.</param>
-    /// <param name="damageType">Type of damage (physical, magical, etc.)</param>
-    void TakeDamage(float amount, DamageType damageType = DamageType.Physical);
+    /// <param name="damageInfo">Informations de degats completes</param>
+    void TakeDamage(DamageInfo damageInfo);
 
     /// <summary>
-    /// Returns true if the entity is dead.
+    /// Retourne vrai si l'entite est morte.
     /// </summary>
     bool IsDead { get; }
-}
-
-/// <summary>
-/// Types of damage in the game.
-/// Can be used for resistances and immunities.
-/// </summary>
-public enum DamageType
-{
-    Physical,
-    Magical,
-    Fire,
-    Ice,
-    Lightning,
-    Poison,
-    True  // Ignores all resistances
 }

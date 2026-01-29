@@ -2,30 +2,34 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// Generic health component for any entity.
-/// Use this for enemies, NPCs, destructible objects.
-/// For players, use PlayerStats instead.
+/// Composant de sante generique pour toute entite.
+/// Utiliser pour les ennemis, PNJ, objets destructibles.
+/// Pour le joueur, utiliser PlayerStats.
 /// </summary>
 public class Health : MonoBehaviour, IDamageable
 {
     [Header("Health Settings")]
     [SerializeField] private float _maxHealth = 100f;
+    [SerializeField] private float _defense = 0f;
     [SerializeField] private bool _destroyOnDeath = true;
     [SerializeField] private float _destroyDelay = 0f;
 
-    [Header("Resistances (0 = normal, 1 = immune, -1 = double damage)")]
+    [Header("Resistances elementaires (0 = normal, 1 = immune, -1 = double degats)")]
     [SerializeField] private float _physicalResistance = 0f;
-    [SerializeField] private float _magicalResistance = 0f;
     [SerializeField] private float _fireResistance = 0f;
+    [SerializeField] private float _waterResistance = 0f;
     [SerializeField] private float _iceResistance = 0f;
-    [SerializeField] private float _lightningResistance = 0f;
-    [SerializeField] private float _poisonResistance = 0f;
+    [SerializeField] private float _electricResistance = 0f;
+    [SerializeField] private float _windResistance = 0f;
+    [SerializeField] private float _earthResistance = 0f;
+    [SerializeField] private float _lightResistance = 0f;
+    [SerializeField] private float _darkResistance = 0f;
 
     private float _currentHealth;
 
     // Events
     public event Action<float, float> OnHealthChanged;  // current, max
-    public event Action<float, DamageType> OnDamaged;   // amount, type
+    public event Action<DamageInfo> OnDamaged;
     public event Action OnDeath;
 
     #region Unity Callbacks
@@ -44,24 +48,35 @@ public class Health : MonoBehaviour, IDamageable
 
     #region IDamageable Implementation
 
-    public void TakeDamage(float amount, DamageType damageType = DamageType.Physical)
+    public void TakeDamage(DamageInfo damageInfo)
     {
         if (IsDead) return;
 
-        // Calculate final damage after resistance
-        float resistance = GetResistance(damageType);
-        float finalDamage = amount * (1f - Mathf.Clamp(resistance, -1f, 1f));
+        // Calculer les degats effectifs avec critique
+        float baseDamage = damageInfo.GetEffectiveDamage();
 
-        // True damage ignores resistances
-        if (damageType == DamageType.True)
+        // Appliquer la resistance elementaire
+        float resistance = GetResistance(damageInfo.damageType);
+        float finalDamage = baseDamage * (1f - Mathf.Clamp(resistance, -1f, 1f));
+
+        // Degats purs ignorent les resistances
+        if (damageInfo.damageType == DamageType.True)
         {
-            finalDamage = amount;
+            finalDamage = baseDamage;
+        }
+        else
+        {
+            // Appliquer la reduction de defense
+            finalDamage = DamageCalculator.CalculateFinalDamage(
+                new DamageInfo { baseDamage = finalDamage, damageType = damageInfo.damageType },
+                _defense
+            );
         }
 
         _currentHealth = Mathf.Max(0, _currentHealth - finalDamage);
 
-        // Notify listeners
-        OnDamaged?.Invoke(finalDamage, damageType);
+        // Notifier les listeners
+        OnDamaged?.Invoke(damageInfo);
         OnHealthChanged?.Invoke(_currentHealth, _maxHealth);
 
         if (_currentHealth <= 0)
@@ -77,7 +92,7 @@ public class Health : MonoBehaviour, IDamageable
     #region Public Methods
 
     /// <summary>
-    /// Heal this entity.
+    /// Soigne cette entite.
     /// </summary>
     public void Heal(float amount)
     {
@@ -88,7 +103,7 @@ public class Health : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// Set health to a specific value.
+    /// Definit la sante a une valeur specifique.
     /// </summary>
     public void SetHealth(float value)
     {
@@ -102,7 +117,7 @@ public class Health : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// Reset health to max.
+    /// Reinitialise la sante au maximum.
     /// </summary>
     public void ResetHealth()
     {
@@ -119,11 +134,14 @@ public class Health : MonoBehaviour, IDamageable
         return type switch
         {
             DamageType.Physical => _physicalResistance,
-            DamageType.Magical => _magicalResistance,
             DamageType.Fire => _fireResistance,
+            DamageType.Water => _waterResistance,
             DamageType.Ice => _iceResistance,
-            DamageType.Lightning => _lightningResistance,
-            DamageType.Poison => _poisonResistance,
+            DamageType.Electric => _electricResistance,
+            DamageType.Wind => _windResistance,
+            DamageType.Earth => _earthResistance,
+            DamageType.Light => _lightResistance,
+            DamageType.Dark => _darkResistance,
             DamageType.True => 0f,
             _ => 0f
         };
@@ -153,6 +171,7 @@ public class Health : MonoBehaviour, IDamageable
     public float CurrentHealth => _currentHealth;
     public float MaxHealth => _maxHealth;
     public float HealthPercent => _currentHealth / _maxHealth;
+    public float Defense => _defense;
 
     #endregion
 }
