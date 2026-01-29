@@ -1370,4 +1370,219 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region ProductionChainManager Tests
+
+    [Test]
+    public void ProductionChainManager_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("ChainManager");
+        var manager = go.AddComponent<ProductionChainManager>();
+
+        var awakeMethod = typeof(ProductionChainManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        // Assert
+        Assert.IsNotNull(manager);
+        Assert.AreEqual(0, manager.ChainCount);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ProductionChainManager_CanCreateChain()
+    {
+        // Arrange
+        var go = new GameObject("ChainManager");
+        var manager = go.AddComponent<ProductionChainManager>();
+
+        var awakeMethod = typeof(ProductionChainManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        // Act
+        var chain = manager.CreateChain("TestChain");
+
+        // Assert
+        Assert.IsNotNull(chain);
+        Assert.AreEqual("TestChain", chain.name);
+        Assert.AreEqual(1, manager.ChainCount);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ProductionChainManager_CanRemoveChain()
+    {
+        // Arrange
+        var go = new GameObject("ChainManager");
+        var manager = go.AddComponent<ProductionChainManager>();
+
+        var awakeMethod = typeof(ProductionChainManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        var chain = manager.CreateChain("TestChain");
+
+        // Act
+        bool removed = manager.RemoveChain(chain);
+
+        // Assert
+        Assert.IsTrue(removed);
+        Assert.AreEqual(0, manager.ChainCount);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ProductionChainManager_CanRegisterBuilding()
+    {
+        // Arrange
+        var managerGO = new GameObject("ChainManager");
+        var manager = managerGO.AddComponent<ProductionChainManager>();
+
+        var awakeMethod = typeof(ProductionChainManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        var buildingGO = new GameObject("Production");
+        var building = buildingGO.AddComponent<ProductionBuilding>();
+
+        // Act
+        manager.RegisterBuilding(building);
+
+        // Assert
+        Assert.AreEqual(1, manager.ProductionBuildingCount);
+
+        // Cleanup
+        Object.DestroyImmediate(buildingGO);
+        Object.DestroyImmediate(managerGO);
+    }
+
+    #endregion
+
+    #region RecipeUnlockManager Tests
+
+    [Test]
+    public void CraftingRecipeData_CanBeCreated()
+    {
+        // Arrange
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+
+        // Assert
+        Assert.IsNotNull(recipe);
+
+        // Cleanup
+        Object.DestroyImmediate(recipe);
+    }
+
+    [Test]
+    public void CraftingRecipeData_HasRequiredFields()
+    {
+        // Arrange
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+        recipe.recipeName = "Test Recipe";
+        recipe.craftTime = 5f;
+        recipe.requiredStation = BuildingSubCategory.Workbench;
+
+        // Assert
+        Assert.AreEqual("Test Recipe", recipe.recipeName);
+        Assert.AreEqual(5f, recipe.craftTime);
+        Assert.AreEqual(BuildingSubCategory.Workbench, recipe.requiredStation);
+
+        // Cleanup
+        Object.DestroyImmediate(recipe);
+    }
+
+    [Test]
+    public void CraftingRecipeData_CanCheckIngredients()
+    {
+        // Arrange
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+        recipe.ingredients = new ResourceCost[]
+        {
+            new ResourceCost { resourceType = ResourceType.Wood, amount = 10 }
+        };
+
+        var storageGO = new GameObject("Storage");
+        var storage = storageGO.AddComponent<StorageBuilding>();
+
+        var awakeMethod = typeof(StorageBuilding).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(storage, null);
+
+        storage.AddResource(ResourceType.Wood, 20);
+
+        // Act & Assert
+        Assert.IsTrue(recipe.HasIngredients(storage));
+
+        // Cleanup
+        Object.DestroyImmediate(recipe);
+        Object.DestroyImmediate(storageGO);
+    }
+
+    #endregion
+
+    #region AutoCrafter Tests
+
+    [Test]
+    public void AutoCrafter_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("AutoCrafter");
+        var crafter = go.AddComponent<AutoCrafter>();
+
+        // Assert
+        Assert.IsNotNull(crafter);
+        Assert.IsTrue(crafter.IsActive);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void AutoCrafter_CanSetMode()
+    {
+        // Arrange
+        var go = new GameObject("AutoCrafter");
+        var crafter = go.AddComponent<AutoCrafter>();
+
+        // Act
+        crafter.SetMode(AutoCraftMode.TargetAmount, 10);
+
+        // Assert
+        Assert.AreEqual(AutoCraftMode.TargetAmount, crafter.Mode);
+        Assert.AreEqual(10, crafter.TargetAmount);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void AutoCraftMode_HasAllModes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(AutoCraftMode), "Continuous"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(AutoCraftMode), "TargetAmount"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(AutoCraftMode), "WhileResources"));
+    }
+
+    [Test]
+    public void RecipeCategory_HasAllCategories()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(RecipeCategory), "Basic"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(RecipeCategory), "Construction"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(RecipeCategory), "Tools"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(RecipeCategory), "Weapons"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(RecipeCategory), "Armor"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(RecipeCategory), "Consumables"));
+    }
+
+    #endregion
 }
