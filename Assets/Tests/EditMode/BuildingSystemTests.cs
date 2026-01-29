@@ -673,4 +673,269 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region BuildingUpgradeManager Tests
+
+    [Test]
+    public void BuildingUpgradeManager_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("UpgradeManager");
+        var manager = go.AddComponent<BuildingUpgradeManager>();
+
+        // Assert
+        Assert.IsNotNull(manager);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void BuildingUpgradeManager_CanCheckUpgradeability()
+    {
+        // Arrange
+        var managerGO = new GameObject("UpgradeManager");
+        var manager = managerGO.AddComponent<BuildingUpgradeManager>();
+
+        var buildingGO = new GameObject("Building");
+        var building = buildingGO.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Wood;
+        data.maxTier = BuildingTier.Tech;
+        data.buildTime = 0f;
+        building.Initialize(data, Vector2Int.zero, 0);
+
+        // Act
+        bool canUpgrade = manager.CanUpgrade(building, BuildingTier.Stone);
+
+        // Assert
+        Assert.IsTrue(canUpgrade);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(buildingGO);
+        Object.DestroyImmediate(managerGO);
+    }
+
+    [Test]
+    public void BuildingUpgradeManager_CalculatesUpgradeCost()
+    {
+        // Arrange
+        var managerGO = new GameObject("UpgradeManager");
+        var manager = managerGO.AddComponent<BuildingUpgradeManager>();
+
+        var buildingGO = new GameObject("Building");
+        var building = buildingGO.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Wood;
+        data.maxTier = BuildingTier.Tech;
+        data.buildTime = 0f;
+        data.buildCosts = new ResourceCost[]
+        {
+            new ResourceCost { resourceType = ResourceType.Wood, amount = 10 }
+        };
+        building.Initialize(data, Vector2Int.zero, 0);
+
+        // Act
+        var costs = manager.GetUpgradeCost(building, BuildingTier.Stone);
+
+        // Assert
+        Assert.IsNotNull(costs);
+        Assert.Greater(costs.Length, 0);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(buildingGO);
+        Object.DestroyImmediate(managerGO);
+    }
+
+    [Test]
+    public void BuildingUpgradeManager_CalculatesUpgradeTime()
+    {
+        // Arrange
+        var managerGO = new GameObject("UpgradeManager");
+        var manager = managerGO.AddComponent<BuildingUpgradeManager>();
+
+        var buildingGO = new GameObject("Building");
+        var building = buildingGO.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Wood;
+        data.maxTier = BuildingTier.Tech;
+        data.buildTime = 5f;
+        building.InstantBuild(); // Forcer la fin de la construction
+        SetField(building, "_data", data);
+        SetField(building, "_currentTier", BuildingTier.Wood);
+
+        // Act
+        float time = manager.GetUpgradeTime(building, BuildingTier.Stone);
+
+        // Assert
+        Assert.Greater(time, 0f);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(buildingGO);
+        Object.DestroyImmediate(managerGO);
+    }
+
+    #endregion
+
+    #region TierVisualConfig Tests
+
+    [Test]
+    public void TierVisualConfig_CanBeCreated()
+    {
+        // Arrange
+        var config = ScriptableObject.CreateInstance<TierVisualConfig>();
+
+        // Assert
+        Assert.IsNotNull(config);
+
+        // Cleanup
+        Object.DestroyImmediate(config);
+    }
+
+    [Test]
+    public void TierVisualConfig_HasColorsForAllTiers()
+    {
+        // Arrange
+        var config = ScriptableObject.CreateInstance<TierVisualConfig>();
+
+        // Act & Assert
+        Assert.AreNotEqual(Color.clear, config.GetColor(BuildingTier.Wood));
+        Assert.AreNotEqual(Color.clear, config.GetColor(BuildingTier.Stone));
+        Assert.AreNotEqual(Color.clear, config.GetColor(BuildingTier.Metal));
+        Assert.AreNotEqual(Color.clear, config.GetColor(BuildingTier.Tech));
+
+        // Cleanup
+        Object.DestroyImmediate(config);
+    }
+
+    [Test]
+    public void TierVisualConfig_HasStatsForAllTiers()
+    {
+        // Arrange
+        var config = ScriptableObject.CreateInstance<TierVisualConfig>();
+
+        // Act & Assert
+        var woodStats = config.GetStats(BuildingTier.Wood);
+        var techStats = config.GetStats(BuildingTier.Tech);
+
+        Assert.Greater(woodStats.healthMultiplier, 0f);
+        Assert.Greater(techStats.healthMultiplier, woodStats.healthMultiplier);
+
+        // Cleanup
+        Object.DestroyImmediate(config);
+    }
+
+    #endregion
+
+    #region Building Upgrade Tests
+
+    [Test]
+    public void Building_CanBeUpgraded()
+    {
+        // Arrange
+        var go = new GameObject("Building");
+        var building = go.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Wood;
+        data.maxTier = BuildingTier.Tech;
+        data.maxHealth = 100f;
+        data.buildTime = 0f; // Pas de temps de construction
+        building.Initialize(data, Vector2Int.zero, 0);
+
+        // Act
+        bool upgraded = building.Upgrade(BuildingTier.Stone);
+
+        // Assert
+        Assert.IsTrue(upgraded);
+        Assert.AreEqual(BuildingTier.Stone, building.CurrentTier);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void Building_RejectsDowngrade()
+    {
+        // Arrange
+        var go = new GameObject("Building");
+        var building = go.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Stone;
+        data.maxTier = BuildingTier.Tech;
+        data.buildTime = 0f;
+        building.Initialize(data, Vector2Int.zero, 0);
+
+        // Act
+        bool downgraded = building.Upgrade(BuildingTier.Wood);
+
+        // Assert
+        Assert.IsFalse(downgraded);
+        Assert.AreEqual(BuildingTier.Stone, building.CurrentTier);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void Building_RejectsUpgradeBeyondMax()
+    {
+        // Arrange
+        var go = new GameObject("Building");
+        var building = go.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Wood;
+        data.maxTier = BuildingTier.Stone;
+        data.buildTime = 0f;
+        building.Initialize(data, Vector2Int.zero, 0);
+
+        // Act - essayer d'upgrader au-dela du max
+        bool upgraded = building.Upgrade(BuildingTier.Metal);
+
+        // Assert
+        Assert.IsFalse(upgraded);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void Building_HealthIncreasesOnUpgrade()
+    {
+        // Arrange
+        var go = new GameObject("Building");
+        var building = go.AddComponent<Building>();
+        var data = ScriptableObject.CreateInstance<BuildingData>();
+        data.canUpgrade = true;
+        data.baseTier = BuildingTier.Wood;
+        data.maxTier = BuildingTier.Tech;
+        data.maxHealth = 100f;
+        data.buildTime = 0f;
+        building.Initialize(data, Vector2Int.zero, 0);
+
+        float initialHealth = building.MaxHealth;
+
+        // Act
+        building.Upgrade(BuildingTier.Stone);
+
+        // Assert
+        Assert.Greater(building.MaxHealth, initialHealth);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
 }
