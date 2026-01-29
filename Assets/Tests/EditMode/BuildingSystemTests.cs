@@ -1832,4 +1832,215 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region WaveData Tests
+
+    [Test]
+    public void WaveData_CanBeCreated()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<WaveData>();
+
+        // Assert
+        Assert.IsNotNull(data);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void WaveData_HasRequiredFields()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<WaveData>();
+        data.waveNumber = 1;
+        data.waveName = "Wave 1";
+        data.startDelay = 5f;
+        data.spawnInterval = 1f;
+
+        // Assert
+        Assert.AreEqual(1, data.waveNumber);
+        Assert.AreEqual("Wave 1", data.waveName);
+        Assert.AreEqual(5f, data.startDelay);
+        Assert.AreEqual(1f, data.spawnInterval);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void WaveData_CalculatesTotalEnemies()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<WaveData>();
+        data.enemyGroups = new EnemyGroup[]
+        {
+            new EnemyGroup { count = 5 },
+            new EnemyGroup { count = 10 }
+        };
+
+        // Act
+        int total = data.GetTotalEnemyCount();
+
+        // Assert
+        Assert.AreEqual(15, total);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void WaveData_CalculatesDifficulty()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<WaveData>();
+        data.healthMultiplier = 1.5f;
+        data.damageMultiplier = 1.5f;
+        data.speedMultiplier = 1f;
+        data.enemyGroups = new EnemyGroup[]
+        {
+            new EnemyGroup { count = 10 }
+        };
+
+        // Act
+        float difficulty = data.GetDifficultyScore();
+
+        // Assert (1.5 * 1.5 * 1 * 10 = 22.5)
+        Assert.AreEqual(22.5f, difficulty, 0.01f);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    #endregion
+
+    #region WaveManager Tests
+
+    [Test]
+    public void WaveManager_CanBeCreated()
+    {
+        // Reset singleton
+        var instanceField = typeof(WaveManager).GetField("_instance",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        instanceField?.SetValue(null, null);
+
+        // Arrange
+        var go = new GameObject("WaveManager");
+        var manager = go.AddComponent<WaveManager>();
+
+        var awakeMethod = typeof(WaveManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        // Assert
+        Assert.IsNotNull(manager);
+        Assert.AreEqual(WaveState.Idle, manager.State);
+
+        // Cleanup
+        instanceField?.SetValue(null, null);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void WaveManager_TracksWaveCount()
+    {
+        // Reset singleton
+        var instanceField = typeof(WaveManager).GetField("_instance",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        instanceField?.SetValue(null, null);
+
+        // Arrange
+        var go = new GameObject("WaveManager");
+        var manager = go.AddComponent<WaveManager>();
+
+        var awakeMethod = typeof(WaveManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        var wave1 = ScriptableObject.CreateInstance<WaveData>();
+        var wave2 = ScriptableObject.CreateInstance<WaveData>();
+        manager.SetWaves(new WaveData[] { wave1, wave2 });
+
+        // Assert
+        Assert.AreEqual(2, manager.TotalWaves);
+
+        // Cleanup
+        instanceField?.SetValue(null, null);
+        Object.DestroyImmediate(wave1);
+        Object.DestroyImmediate(wave2);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void WaveState_HasAllStates()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveState), "Idle"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveState), "Preparing"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveState), "Spawning"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveState), "InProgress"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveState), "Paused"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveState), "Completed"));
+    }
+
+    #endregion
+
+    #region WaveSpawnPoint Tests
+
+    [Test]
+    public void WaveSpawnPoint_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Spawner");
+        var spawner = go.AddComponent<WaveSpawnPoint>();
+
+        // Assert
+        Assert.IsNotNull(spawner);
+        Assert.IsTrue(spawner.IsActive);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void WaveSpawnPoint_ReturnsPosition()
+    {
+        // Arrange
+        var go = new GameObject("Spawner");
+        go.transform.position = new Vector3(10f, 0f, 5f);
+        var spawner = go.AddComponent<WaveSpawnPoint>();
+        spawner.Configure(WaveSpawnType.Point, 0f, Vector3.one);
+
+        // Act
+        Vector3 pos = spawner.GetSpawnPosition();
+
+        // Assert
+        Assert.AreEqual(new Vector3(10f, 0f, 5f), pos);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void WaveSpawnType_HasAllTypes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveSpawnType), "Point"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveSpawnType), "Circle"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveSpawnType), "Box"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(WaveSpawnType), "Edge"));
+    }
+
+    [Test]
+    public void SpecialEventType_HasAllTypes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SpecialEventType), "None"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SpecialEventType), "DoubleRewards"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SpecialEventType), "InvisibleEnemies"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SpecialEventType), "FastEnemies"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SpecialEventType), "ArmoredEnemies"));
+    }
+
+    #endregion
 }
