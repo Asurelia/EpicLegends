@@ -938,4 +938,277 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region ResourceData Tests
+
+    [Test]
+    public void ResourceData_CanBeCreated()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<ResourceData>();
+
+        // Assert
+        Assert.IsNotNull(data);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void ResourceData_HasCorrectDefaults()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<ResourceData>();
+
+        // Assert
+        Assert.AreEqual(100, data.maxStackSize);
+        Assert.Greater(data.weight, 0f);
+        Assert.IsTrue(data.canBeGathered);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void ResourceData_CanCheckToolRequirement()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<ResourceData>();
+        data.requiredTool = ToolType.Axe;
+
+        // Act & Assert
+        Assert.IsTrue(data.CanGatherWith(ToolType.Axe));
+        Assert.IsFalse(data.CanGatherWith(ToolType.Pickaxe));
+        Assert.IsTrue(data.CanGatherWith(ToolType.Universal));
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    #endregion
+
+    #region ResourceManager Tests
+
+    [Test]
+    public void ResourceManager_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("ResourceManager");
+        var manager = go.AddComponent<ResourceManager>();
+
+        // Assert
+        Assert.IsNotNull(manager);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ResourceManager_CanAddResources()
+    {
+        // Arrange
+        var go = new GameObject("ResourceManager");
+        var manager = go.AddComponent<ResourceManager>();
+
+        var awakeMethod = typeof(ResourceManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        // Act
+        bool added = manager.AddResource(ResourceType.Wood, 50);
+
+        // Assert
+        Assert.IsTrue(added);
+        Assert.AreEqual(50, manager.GetResourceCount(ResourceType.Wood));
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ResourceManager_CanRemoveResources()
+    {
+        // Arrange
+        var go = new GameObject("ResourceManager");
+        var manager = go.AddComponent<ResourceManager>();
+
+        var awakeMethod = typeof(ResourceManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        manager.AddResource(ResourceType.Stone, 100);
+
+        // Act
+        bool removed = manager.RemoveResource(ResourceType.Stone, 30);
+
+        // Assert
+        Assert.IsTrue(removed);
+        Assert.AreEqual(70, manager.GetResourceCount(ResourceType.Stone));
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ResourceManager_CanCheckMultipleResources()
+    {
+        // Arrange
+        var go = new GameObject("ResourceManager");
+        var manager = go.AddComponent<ResourceManager>();
+
+        var awakeMethod = typeof(ResourceManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        manager.AddResource(ResourceType.Wood, 50);
+        manager.AddResource(ResourceType.Stone, 30);
+
+        var costs = new ResourceCost[]
+        {
+            new ResourceCost { resourceType = ResourceType.Wood, amount = 25 },
+            new ResourceCost { resourceType = ResourceType.Stone, amount = 20 }
+        };
+
+        // Act
+        bool hasAll = manager.HasResources(costs);
+
+        // Assert
+        Assert.IsTrue(hasAll);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
+
+    #region ResourceSource Tests
+
+    [Test]
+    public void ResourceSource_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("ResourceSource");
+        var source = go.AddComponent<ResourceSource>();
+
+        // Assert
+        Assert.IsNotNull(source);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ResourceSource_CanBeDepleted()
+    {
+        // Arrange
+        var go = new GameObject("ResourceSource");
+        var source = go.AddComponent<ResourceSource>();
+
+        // Act
+        source.Deplete();
+
+        // Assert
+        Assert.IsTrue(source.IsDepleted);
+        Assert.AreEqual(0, source.CurrentResources);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ResourceSource_CanRespawn()
+    {
+        // Arrange
+        var go = new GameObject("ResourceSource");
+        var source = go.AddComponent<ResourceSource>();
+        source.Deplete();
+
+        // Act
+        source.Respawn();
+
+        // Assert
+        Assert.IsFalse(source.IsDepleted);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
+
+    #region GatheringTool Tests
+
+    [Test]
+    public void GatheringTool_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Tool");
+        var tool = go.AddComponent<GatheringTool>();
+
+        // Assert
+        Assert.IsNotNull(tool);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void GatheringTool_HasDurability()
+    {
+        // Arrange
+        var go = new GameObject("Tool");
+        var tool = go.AddComponent<GatheringTool>();
+        tool.Configure(ToolType.Axe, 1f, 2f, 100);
+
+        // Assert
+        Assert.AreEqual(100, tool.CurrentDurability);
+        Assert.AreEqual(100, tool.MaxDurability);
+        Assert.IsFalse(tool.IsBroken);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void GatheringTool_CanBeRepaired()
+    {
+        // Arrange
+        var go = new GameObject("Tool");
+        var tool = go.AddComponent<GatheringTool>();
+        tool.Configure(ToolType.Pickaxe, 1f, 2f, 100);
+
+        // Simuler utilisation
+        SetField(tool, "_currentDurability", 50);
+
+        // Act
+        tool.Repair(30);
+
+        // Assert
+        Assert.AreEqual(80, tool.CurrentDurability);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ToolType_HasAllTypes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ToolType), "None"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ToolType), "Axe"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ToolType), "Pickaxe"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ToolType), "Shovel"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ToolType), "Universal"));
+    }
+
+    [Test]
+    public void BiomeType_HasAllTypes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(BiomeType), "Forest"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(BiomeType), "Mountains"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(BiomeType), "Desert"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(BiomeType), "Cave"));
+    }
+
+    #endregion
 }
