@@ -177,11 +177,37 @@ public class EnemyData : ScriptableObject
 }
 
 /// <summary>
-/// Reference a une table de loot (placeholder).
+/// Reference a une table de loot.
+/// Definit les items pouvant etre obtenus et leurs probabilites.
 /// </summary>
 [System.Serializable]
 public class LootTable
 {
+    [Tooltip("Nom de la table de loot")]
     public string tableName;
-    // TODO: Implementer le systeme de loot complet
+
+    [Tooltip("Entrees de la table de loot")]
+    public LootTableEntry[] entries;
+}
+
+/// <summary>
+/// Entree dans une table de loot.
+/// </summary>
+[System.Serializable]
+public struct LootTableEntry
+{
+    [Tooltip("Item a obtenir")]
+    public ItemData item;
+
+    [Tooltip("Chance de drop (0-1)")]
+    [Range(0f, 1f)]
+    public float dropChance;
+
+    [Tooltip("Quantite minimum")]
+    [Min(1)]
+    public int minAmount;
+
+    [Tooltip("Quantite maximum")]
+    [Min(1)]
+    public int maxAmount;
 }
