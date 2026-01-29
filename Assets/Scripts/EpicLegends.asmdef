@@ -2,7 +2,8 @@
     "name": "EpicLegends",
     "rootNamespace": "",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Cinemachine"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
