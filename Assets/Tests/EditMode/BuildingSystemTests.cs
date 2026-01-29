@@ -1585,4 +1585,251 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region TowerData Tests
+
+    [Test]
+    public void TowerData_CanBeCreated()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<TowerData>();
+
+        // Assert
+        Assert.IsNotNull(data);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void TowerData_HasRequiredFields()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<TowerData>();
+        data.towerName = "Test Tower";
+        data.towerType = TowerType.Arrow;
+        data.range = 15f;
+        data.damage = 25f;
+        data.fireRate = 2f;
+
+        // Assert
+        Assert.AreEqual("Test Tower", data.towerName);
+        Assert.AreEqual(TowerType.Arrow, data.towerType);
+        Assert.AreEqual(15f, data.range);
+        Assert.AreEqual(25f, data.damage);
+        Assert.AreEqual(2f, data.fireRate);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void TowerData_CalculatesStatsPerLevel()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<TowerData>();
+        data.damage = 10f;
+        data.range = 10f;
+        data.fireRate = 1f;
+        data.damagePerLevel = 0.2f;
+        data.rangePerLevel = 0.1f;
+        data.fireRatePerLevel = 0.15f;
+
+        // Act - Level 1
+        float damage1 = data.GetDamageAtLevel(1);
+        float range1 = data.GetRangeAtLevel(1);
+        float fireRate1 = data.GetFireRateAtLevel(1);
+
+        // Assert Level 1
+        Assert.AreEqual(10f, damage1);
+        Assert.AreEqual(10f, range1);
+        Assert.AreEqual(1f, fireRate1);
+
+        // Act - Level 3
+        float damage3 = data.GetDamageAtLevel(3);
+
+        // Assert Level 3 (base * (1 + 0.2 * 2) = 10 * 1.4 = 14)
+        Assert.AreEqual(14f, damage3, 0.01f);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    [Test]
+    public void TowerData_CalculatesDPS()
+    {
+        // Arrange
+        var data = ScriptableObject.CreateInstance<TowerData>();
+        data.damage = 10f;
+        data.fireRate = 2f;
+
+        // Act
+        float dps = data.GetDPS();
+
+        // Assert (10 damage * 2 shots/sec = 20 DPS)
+        Assert.AreEqual(20f, dps);
+
+        // Cleanup
+        Object.DestroyImmediate(data);
+    }
+
+    #endregion
+
+    #region DefenseManager Tests
+
+    [Test]
+    public void DefenseManager_CanBeCreated()
+    {
+        // Reset singleton
+        var instanceField = typeof(DefenseManager).GetField("_instance",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        instanceField?.SetValue(null, null);
+
+        // Arrange
+        var go = new GameObject("DefenseManager");
+        var manager = go.AddComponent<DefenseManager>();
+
+        var awakeMethod = typeof(DefenseManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        // Assert
+        Assert.IsNotNull(manager);
+        Assert.AreEqual(0, manager.TowerCount);
+
+        // Cleanup
+        instanceField?.SetValue(null, null);
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void DefenseManager_CanRegisterTower()
+    {
+        // Reset singleton
+        var instanceField = typeof(DefenseManager).GetField("_instance",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        instanceField?.SetValue(null, null);
+
+        // Arrange
+        var managerGO = new GameObject("DefenseManager");
+        var manager = managerGO.AddComponent<DefenseManager>();
+
+        var awakeMethod = typeof(DefenseManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        var towerGO = new GameObject("Tower");
+        var tower = towerGO.AddComponent<DefenseTower>();
+
+        // Act
+        manager.RegisterTower(tower);
+
+        // Assert
+        Assert.AreEqual(1, manager.TowerCount);
+
+        // Cleanup
+        instanceField?.SetValue(null, null);
+        Object.DestroyImmediate(towerGO);
+        Object.DestroyImmediate(managerGO);
+    }
+
+    [Test]
+    public void DefenseManager_TracksStats()
+    {
+        // Reset singleton
+        var instanceField = typeof(DefenseManager).GetField("_instance",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        instanceField?.SetValue(null, null);
+
+        // Arrange
+        var go = new GameObject("DefenseManager");
+        var manager = go.AddComponent<DefenseManager>();
+
+        var awakeMethod = typeof(DefenseManager).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
+
+        // Act
+        manager.RecordDamage(100f);
+        manager.RecordKill();
+
+        // Assert
+        Assert.AreEqual(100f, manager.Stats.totalDamageDealt);
+        Assert.AreEqual(1, manager.Stats.totalKills);
+
+        // Cleanup
+        instanceField?.SetValue(null, null);
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
+
+    #region DefenseZone Tests
+
+    [Test]
+    public void DefenseZone_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Zone");
+        var zone = go.AddComponent<DefenseZone>();
+
+        // Assert
+        Assert.IsNotNull(zone);
+        Assert.IsTrue(zone.IsActive);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void DefenseZone_ChecksPointInCircle()
+    {
+        // Arrange
+        var go = new GameObject("Zone");
+        var zone = go.AddComponent<DefenseZone>();
+        zone.Configure(ZoneShape.Circle, 10f, Vector3.one);
+
+        // Act & Assert
+        Assert.IsTrue(zone.ContainsPoint(Vector3.zero));
+        Assert.IsTrue(zone.ContainsPoint(new Vector3(5f, 0f, 0f)));
+        Assert.IsFalse(zone.ContainsPoint(new Vector3(15f, 0f, 0f)));
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void DefenseZone_TakesDamage()
+    {
+        // Arrange
+        var go = new GameObject("Zone");
+        var zone = go.AddComponent<DefenseZone>();
+
+        var awakeMethod = typeof(DefenseZone).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(zone, null);
+
+        zone.SetObjective(null, 100f);
+
+        // Act
+        zone.TakeDamage(30f);
+
+        // Assert
+        Assert.AreEqual(70f, zone.ObjectiveHealth);
+        Assert.IsFalse(zone.IsDestroyed);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ZoneShape_HasAllShapes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ZoneShape), "Circle"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ZoneShape), "Box"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(ZoneShape), "Sphere"));
+    }
+
+    #endregion
 }
