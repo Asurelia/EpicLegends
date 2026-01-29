@@ -1211,4 +1211,163 @@ public class BuildingSystemTests
     }
 
     #endregion
+
+    #region ConveyorBelt Tests
+
+    [Test]
+    public void ConveyorBelt_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Conveyor");
+        var conveyor = go.AddComponent<ConveyorBelt>();
+
+        // Assert
+        Assert.IsNotNull(conveyor);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ConveyorBelt_CanAddItem()
+    {
+        // Arrange
+        var go = new GameObject("Conveyor");
+        var conveyor = go.AddComponent<ConveyorBelt>();
+
+        var awakeMethod = typeof(ConveyorBelt).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(conveyor, null);
+
+        // Act
+        bool added = conveyor.AddItem(ResourceType.Wood, 5);
+
+        // Assert
+        Assert.IsTrue(added);
+        Assert.AreEqual(1, conveyor.ItemCount);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ConveyorBelt_HasProperties()
+    {
+        // Arrange
+        var go = new GameObject("Conveyor");
+        var conveyor = go.AddComponent<ConveyorBelt>();
+
+        var awakeMethod = typeof(ConveyorBelt).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(conveyor, null);
+
+        // Assert
+        Assert.Greater(conveyor.Speed, 0f);
+        Assert.Greater(conveyor.Length, 0f);
+        Assert.IsTrue(conveyor.IsEmpty);
+        Assert.IsFalse(conveyor.IsFull);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    #endregion
+
+    #region ItemSplitter Tests
+
+    [Test]
+    public void ItemSplitter_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Splitter");
+        var splitter = go.AddComponent<ItemSplitter>();
+
+        // Assert
+        Assert.IsNotNull(splitter);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void ItemSplitter_CanSetMode()
+    {
+        // Arrange
+        var go = new GameObject("Splitter");
+        var splitter = go.AddComponent<ItemSplitter>();
+
+        // Act
+        splitter.SetSplitMode(SplitMode.Random);
+
+        // Assert
+        Assert.AreEqual(SplitMode.Random, splitter.SplitMode);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void SplitMode_HasAllModes()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SplitMode), "RoundRobin"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SplitMode), "Priority"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SplitMode), "Random"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(SplitMode), "Overflow"));
+    }
+
+    #endregion
+
+    #region LogisticsNetwork Tests
+
+    [Test]
+    public void LogisticsNetwork_CanBeCreated()
+    {
+        // Arrange
+        var go = new GameObject("Network");
+        var network = go.AddComponent<LogisticsNetwork>();
+
+        // Assert
+        Assert.IsNotNull(network);
+
+        // Cleanup
+        Object.DestroyImmediate(go);
+    }
+
+    [Test]
+    public void LogisticsNetwork_CanRegisterStorage()
+    {
+        // Arrange
+        var networkGO = new GameObject("Network");
+        var network = networkGO.AddComponent<LogisticsNetwork>();
+
+        var awakeMethod = typeof(LogisticsNetwork).GetMethod("Awake",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        awakeMethod?.Invoke(network, null);
+
+        var storageGO = new GameObject("Storage");
+        var storage = storageGO.AddComponent<StorageBuilding>();
+
+        // Act
+        network.RegisterStorage(storage);
+
+        // Assert
+        Assert.AreEqual(1, network.StorageCount);
+
+        // Cleanup
+        Object.DestroyImmediate(storageGO);
+        Object.DestroyImmediate(networkGO);
+    }
+
+    [Test]
+    public void StoragePriority_HasAllLevels()
+    {
+        // Assert
+        Assert.IsTrue(System.Enum.IsDefined(typeof(StoragePriority), "Low"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(StoragePriority), "Normal"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(StoragePriority), "High"));
+        Assert.IsTrue(System.Enum.IsDefined(typeof(StoragePriority), "Critical"));
+    }
+
+    #endregion
 }
