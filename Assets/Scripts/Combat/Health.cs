@@ -125,6 +125,30 @@ public class Health : MonoBehaviour, IDamageable
         OnHealthChanged?.Invoke(_currentHealth, _maxHealth);
     }
 
+    /// <summary>
+    /// Definit la sante maximale.
+    /// </summary>
+    public void SetMaxHealth(float value)
+    {
+        _maxHealth = Mathf.Max(1f, value);
+        _currentHealth = Mathf.Min(_currentHealth, _maxHealth);
+        OnHealthChanged?.Invoke(_currentHealth, _maxHealth);
+    }
+
+    /// <summary>
+    /// Definit la sante actuelle.
+    /// </summary>
+    public void SetCurrentHealth(float value)
+    {
+        _currentHealth = Mathf.Clamp(value, 0f, _maxHealth);
+        OnHealthChanged?.Invoke(_currentHealth, _maxHealth);
+
+        if (_currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
     #endregion
 
     #region Private Methods
