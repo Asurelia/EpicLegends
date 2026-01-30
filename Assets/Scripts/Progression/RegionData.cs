@@ -125,21 +125,7 @@ public class RegionData : ScriptableObject
 }
 
 // Note: BiomeType est deja defini dans Building/ResourceData.cs
-
-/// <summary>
-/// Types de meteo.
-/// </summary>
-public enum WeatherType
-{
-    Clear,
-    Cloudy,
-    Rain,
-    Storm,
-    Snow,
-    Fog,
-    Sandstorm,
-    Blizzard
-}
+// Note: WeatherType est deja defini dans Polish/VisualEffectsManager.cs
 
 /// <summary>
 /// Point d'interet.

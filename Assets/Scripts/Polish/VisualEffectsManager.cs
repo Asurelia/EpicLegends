@@ -787,7 +787,9 @@ public enum WeatherType
     Rain,
     Storm,
     Snow,
-    Fog
+    Fog,
+    Sandstorm,
+    Blizzard
 }
 
 /// <summary>
