@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4078bd19c9ac3434ea365fb006d6a8f3, type: 3}
+  m_Name: Boss_DeathLord
+  m_EditorClassIdentifier: EpicLegends::EnemyData
+  enemyName: Seigneur des Morts
+  description: Le maitre du donjon, un necromancien puissant.
+  enemyType: 2
+  baseBehavior: 0
+  prefab: {fileID: 0}
+  maxHealth: 1500
+  defense: 20
+  attackDamage: 60
+  moveSpeed: 3
+  chaseSpeed: 4
+  detectionRange: 25
+  attackRange: 15
+  fieldOfView: 120
+  fleeDistance: 15
+  attackCooldown: 2
+  damageType: 0
+  staggerValue: 10
+  knockbackForce: 3
+  attackPatterns: []
+  physicalResistance: 0.3
+  fireResistance: 0
+  waterResistance: 0
+  iceResistance: 0
+  electricResistance: 0
+  experienceReward: 800
+  goldMin: 200
+  goldMax: 400
+  lootTable:
+    tableName: 
+    entries: []
+  attackSounds: []
+  hitSounds: []
+  deathSound: {fileID: 0}

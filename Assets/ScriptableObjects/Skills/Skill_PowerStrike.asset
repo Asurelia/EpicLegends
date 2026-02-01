@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 123969af1b4336e4f94d102068f5dff5, type: 3}
+  m_Name: Skill_PowerStrike
+  m_EditorClassIdentifier: EpicLegends::SkillData
+  skillName: Frappe Puissante
+  description: Une attaque devastatrice qui inflige 150% des degats.
+  icon: {fileID: 0}
+  skillType: 0
+  category: 0
+  manaCost: 15
+  staminaCost: 20
+  cooldown: 5
+  castTime: 0
+  targetType: 1
+  range: 3
+  areaRadius: 3
+  coneAngle: 45
+  baseDamage: 30
+  damageType: 0
+  damageScaling: 1.5
+  hitCount: 1
+  hitInterval: 0.2
+  appliesElement: 0
+  elementType: 0
+  elementGauge: 1
+  isHeal: 0
+  baseHeal: 0
+  appliesStatusEffect: 0
+  statusDuration: 5
+  passiveAttackBonus: 0
+  passiveDefenseBonus: 0
+  passiveSpeedBonus: 0
+  passiveCritBonus: 0
+  currentLevel: 1
+  maxLevel: 10
+  damagePerLevel: 5
+  cooldownReductionPerLevel: 0.1
+  prerequisites: []
+  animationTrigger: PowerStrike
+  vfxPrefab: {fileID: 0}
+  soundEffect: {fileID: 0}

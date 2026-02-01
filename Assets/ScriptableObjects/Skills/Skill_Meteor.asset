@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 123969af1b4336e4f94d102068f5dff5, type: 3}
+  m_Name: Skill_Meteor
+  m_EditorClassIdentifier: EpicLegends::SkillData
+  skillName: Meteor
+  description: Invoque un meteor devastateur du ciel.
+  icon: {fileID: 0}
+  skillType: 2
+  category: 0
+  manaCost: 80
+  staminaCost: 0
+  cooldown: 90
+  castTime: 2
+  targetType: 5
+  range: 30
+  areaRadius: 6
+  coneAngle: 45
+  baseDamage: 200
+  damageType: 1
+  damageScaling: 2
+  hitCount: 1
+  hitInterval: 0.2
+  appliesElement: 1
+  elementType: 0
+  elementGauge: 5
+  isHeal: 0
+  baseHeal: 0
+  appliesStatusEffect: 0
+  statusDuration: 5
+  passiveAttackBonus: 0
+  passiveDefenseBonus: 0
+  passiveSpeedBonus: 0
+  passiveCritBonus: 0
+  currentLevel: 1
+  maxLevel: 10
+  damagePerLevel: 5
+  cooldownReductionPerLevel: 0.1
+  prerequisites: []
+  animationTrigger: CastMeteor
+  vfxPrefab: {fileID: 0}
+  soundEffect: {fileID: 0}
