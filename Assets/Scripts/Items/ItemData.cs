@@ -59,6 +59,18 @@ public class ItemData : ScriptableObject
     [Tooltip("Bonus de stats apportés par l'objet")]
     public List<ItemStatBonus> statBonuses = new List<ItemStatBonus>();
 
+    [Header("Combat Stats")]
+    public float attackPower = 0f;
+    public float defensePower = 0f;
+    public float healthBonus = 0f;
+    public float manaBonus = 0f;
+    public float critChanceBonus = 0f;
+    public float critDamageBonus = 0f;
+
+    [Header("Consumable Effects")]
+    public float healAmount = 0f;
+    public float manaRestoreAmount = 0f;
+
     [Header("Consommable (si applicable)")]
     [Tooltip("L'objet est-il consommable?")]
     public bool isConsumable = false;

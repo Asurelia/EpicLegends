@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System;
 
 /// <summary>
 /// Controls player movement, rotation and basic actions.
@@ -74,27 +75,27 @@ public class PlayerController : MonoBehaviour
     #region Input System Callbacks
 
     /// <summary>
-    /// Called by Input System when Move action is performed.
+    /// Called by Input System when Move action is performed (Send Messages mode with InputValue).
     /// </summary>
-    public void OnMove(InputAction.CallbackContext context)
+    public void OnMove(InputValue value)
     {
-        _moveInput = context.ReadValue<Vector2>();
+        _moveInput = value.Get<Vector2>();
     }
 
     /// <summary>
-    /// Called by Input System when Sprint action is performed.
+    /// Called by Input System when Sprint action is performed (Send Messages mode).
     /// </summary>
-    public void OnSprint(InputAction.CallbackContext context)
+    public void OnSprint(InputValue value)
     {
-        _isSprinting = context.performed;
+        _isSprinting = value.isPressed;
     }
 
     /// <summary>
-    /// Called by Input System when Jump action is performed.
+    /// Called by Input System when Jump action is performed (Send Messages mode).
     /// </summary>
-    public void OnJump(InputAction.CallbackContext context)
+    public void OnJump(InputValue value)
     {
-        if (context.started && _isGrounded)
+        if (_isGrounded)
         {
             _jumpRequested = true;
         }
@@ -157,12 +158,24 @@ public class PlayerController : MonoBehaviour
         // Raycast from center of capsule collider
         Vector3 origin = transform.position + Vector3.up * (_capsuleCollider.radius);
 
-        _isGrounded = Physics.Raycast(
-            origin,
-            Vector3.down,
-            _capsuleCollider.radius + _groundCheckDistance,
-            _groundLayer
-        );
+        // If no ground layer specified, check against all layers except player
+        if (_groundLayer == 0)
+        {
+            _isGrounded = Physics.Raycast(
+                origin,
+                Vector3.down,
+                _capsuleCollider.radius + _groundCheckDistance
+            );
+        }
+        else
+        {
+            _isGrounded = Physics.Raycast(
+                origin,
+                Vector3.down,
+                _capsuleCollider.radius + _groundCheckDistance,
+                _groundLayer
+            );
+        }
     }
 
     #endregion

@@ -357,15 +357,16 @@ public class SkillController : MonoBehaviour
 
     private void ExecuteSkill(SkillData skill)
     {
-        // L'execution reelle depend du type de competence
-        // Pour l'instant, on log juste
-        Debug.Log($"Executing skill: {skill.skillName}");
-
-        // TODO: Implementer l'execution selon le targetType
-        // - Self: appliquer directement
-        // - SingleEnemy: chercher la cible, appliquer
-        // - Area: OverlapSphere, appliquer a tous
-        // etc.
+        // Deleguer l'execution au SkillExecutor
+        if (SkillExecutor.Instance != null)
+        {
+            var playerStats = GetComponent<PlayerStats>();
+            SkillExecutor.Instance.Execute(skill, transform, playerStats);
+        }
+        else
+        {
+            Debug.LogWarning("[SkillController] SkillExecutor.Instance non trouve!");
+        }
     }
 
     #endregion

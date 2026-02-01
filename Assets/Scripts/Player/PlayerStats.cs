@@ -20,6 +20,20 @@ public class PlayerStats : MonoBehaviour
     [SerializeField] private float _staminaRegenRate = 15f;
     [SerializeField] private float _staminaDrainRate = 20f;
 
+    [Header("Attributes")]
+    [SerializeField] private int _strength = 10;
+    [SerializeField] private int _agility = 10;
+    [SerializeField] private int _intelligence = 10;
+
+    [Header("Combat")]
+    [SerializeField] private float _critChance = 0.05f;
+    [SerializeField] private float _critDamage = 1.5f;
+
+    [Header("Progression")]
+    [SerializeField] private int _level = 1;
+    [SerializeField] private int _experience = 0;
+    [SerializeField] private int _gold = 0;
+
     // Current values
     private float _currentHealth;
     private float _currentMana;
@@ -214,6 +228,92 @@ public class PlayerStats : MonoBehaviour
     public float StaminaPercent => _currentStamina / _maxStamina;
 
     public bool IsDead => _currentHealth <= 0;
+
+    // Attributes
+    public int Strength => _strength;
+    public int Agility => _agility;
+    public int Intelligence => _intelligence;
+
+    // Combat
+    public float CritChance => _critChance;
+    public float CritDamage => _critDamage;
+
+    // Progression
+    public int Level => _level;
+    public int Experience => _experience;
+    public int Gold => _gold;
+
+    #endregion
+
+    #region Public Methods - Progression
+
+    /// <summary>
+    /// Ajoute de l'experience et gere le level up.
+    /// </summary>
+    public void AddExperience(int amount)
+    {
+        if (amount <= 0) return;
+
+        _experience += amount;
+
+        // Verifier level up
+        int xpForNextLevel = GetXPForLevel(_level + 1);
+        while (_experience >= xpForNextLevel && _level < 100)
+        {
+            _experience -= xpForNextLevel;
+            LevelUp();
+            xpForNextLevel = GetXPForLevel(_level + 1);
+        }
+
+        OnExperienceChanged?.Invoke(_experience, xpForNextLevel);
+    }
+
+    /// <summary>
+    /// Ajoute de l'or.
+    /// </summary>
+    public void AddGold(int amount)
+    {
+        _gold += amount;
+        OnGoldChanged?.Invoke(_gold);
+    }
+
+    /// <summary>
+    /// Retire de l'or.
+    /// </summary>
+    public bool SpendGold(int amount)
+    {
+        if (_gold < amount) return false;
+        _gold -= amount;
+        OnGoldChanged?.Invoke(_gold);
+        return true;
+    }
+
+    private void LevelUp()
+    {
+        _level++;
+        // Augmenter les stats max
+        _maxHealth += 10f;
+        _maxMana += 5f;
+        _maxStamina += 5f;
+        // Soigner completement
+        _currentHealth = _maxHealth;
+        _currentMana = _maxMana;
+        _currentStamina = _maxStamina;
+
+        OnLevelUp?.Invoke(_level);
+        Debug.Log($"[PlayerStats] Level Up! Now level {_level}");
+    }
+
+    private int GetXPForLevel(int level)
+    {
+        // Formule: XP = 100 * level^2.2
+        return Mathf.RoundToInt(100f * Mathf.Pow(level, 2.2f));
+    }
+
+    // Events pour progression
+    public event Action<int, int> OnExperienceChanged; // current, required
+    public event Action<int> OnGoldChanged;
+    public event Action<int> OnLevelUp;
 
     #endregion
 }

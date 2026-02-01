@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Gestionnaire central de l'interface utilisateur.
@@ -29,6 +30,7 @@ public class UIManager : MonoBehaviour
 
     private Dictionary<string, UIPanel> _registeredPanels = new Dictionary<string, UIPanel>();
     private Stack<UIPanel> _panelStack = new Stack<UIPanel>();
+    private InputAction _escapeAction;
 
     #endregion
 
@@ -110,12 +112,32 @@ public class UIManager : MonoBehaviour
             return;
         }
         _instance = this;
+
+        SetupInputActions();
     }
 
-    private void Update()
+    private void OnEnable()
     {
-        // Gerer la fermeture avec Escape
-        if (Input.GetKeyDown(KeyCode.Escape) && CurrentPanel != null && CurrentPanel.CanCloseWithEscape)
+        _escapeAction?.Enable();
+    }
+
+    private void OnDisable()
+    {
+        _escapeAction?.Disable();
+    }
+
+    private void SetupInputActions()
+    {
+        _escapeAction = new InputAction("UIEscape", InputActionType.Button);
+        _escapeAction.AddBinding("<Keyboard>/escape");
+        _escapeAction.AddBinding("<Gamepad>/buttonEast"); // B button
+        _escapeAction.performed += OnEscapePressed;
+        _escapeAction.Enable();
+    }
+
+    private void OnEscapePressed(InputAction.CallbackContext context)
+    {
+        if (CurrentPanel != null && CurrentPanel.CanCloseWithEscape)
         {
             PopPanel();
         }

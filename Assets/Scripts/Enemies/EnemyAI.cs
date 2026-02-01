@@ -1,47 +1,98 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
 /// <summary>
-/// Basic enemy AI with patrol, chase, and attack behaviors.
+/// Advanced enemy AI with configurable behaviors.
+/// Supports patrol, chase, attack patterns, and tactical behaviors.
 /// Uses Unity NavMesh for navigation.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Health))]
 public class EnemyAI : MonoBehaviour
 {
-    [Header("Detection")]
-    [SerializeField] private float _detectionRange = 10f;
-    [SerializeField] private float _attackRange = 2f;
-    [SerializeField] private float _fieldOfView = 120f;
-    [SerializeField] private LayerMask _playerLayer;
-    [SerializeField] private LayerMask _obstacleLayer;
+    #region Serialized Fields
 
-    [Header("Combat")]
-    [SerializeField] private float _attackDamage = 10f;
-    [SerializeField] private float _attackCooldown = 1.5f;
-    [SerializeField] private DamageType _damageType = DamageType.Physical;
+    [Header("Configuration")]
+    [SerializeField] private EnemyData _enemyData;
+
+    [Header("Detection Overrides")]
+    [SerializeField] private LayerMask _playerLayer = 1 << 6;
+    [SerializeField] private LayerMask _obstacleLayer = 1 << 0;
 
     [Header("Patrol")]
     [SerializeField] private Transform[] _patrolPoints;
     [SerializeField] private float _patrolWaitTime = 2f;
 
-    [Header("Movement")]
-    [SerializeField] private float _patrolSpeed = 2f;
-    [SerializeField] private float _chaseSpeed = 4f;
+    [Header("Combat")]
+    [SerializeField] private Transform _attackPoint;
+    [SerializeField] private float _attackRadius = 1f;
+
+    [Header("Stagger")]
+    [SerializeField] private float _staggerThreshold = 30f;
+    [SerializeField] private float _staggerDuration = 1.5f;
+    [SerializeField] private float _staggerRecoveryTime = 3f;
+
+    [Header("Ranged Combat")]
+    [SerializeField] private GameObject _projectilePrefab;
+    [SerializeField] private Transform _projectileSpawnPoint;
+    [SerializeField] private float _projectileSpeed = 15f;
+
+    [Header("Flee Behavior")]
+    [SerializeField] private float _lowHealthPercent = 0.25f;
+
+    #endregion
+
+    #region Private Fields
 
     // State
-    private enum AIState { Idle, Patrol, Chase, Attack }
-    private AIState _currentState = AIState.Idle;
+    private EnemyAIState _currentState = EnemyAIState.Idle;
+    private EnemyAIState _previousState;
+    private Vector3 _spawnPosition;
+    private float _staggerAccumulator;
+    private float _staggerRecoveryTimer;
+    private float _staggerEndTime;
 
     // Cached components
     private NavMeshAgent _agent;
     private Health _health;
+    private Animator _animator;
+    private AggroSystem _aggro;
 
     // Target
-    private Transform _player;
+    private Transform _currentTarget;
     private int _currentPatrolIndex;
     private float _waitTimer;
     private float _attackTimer;
+    private float _lastAttackTime;
+
+    // Attack patterns
+    private AttackPattern _currentPattern;
+    private int _currentAttackIndex;
+    private Dictionary<AttackPattern, float> _patternCooldowns = new Dictionary<AttackPattern, float>();
+
+    // Runtime values from EnemyData
+    private float _detectionRange;
+    private float _attackRange;
+    private float _fieldOfView;
+    private float _patrolSpeed;
+    private float _chaseSpeed;
+    private float _attackDamage;
+    private float _attackCooldown;
+    private DamageType _damageType;
+    private AIBehavior _behavior;
+
+    #endregion
+
+    #region Properties
+
+    public EnemyAIState CurrentState => _currentState;
+    public EnemyData Data => _enemyData;
+    public Transform CurrentTarget => _currentTarget;
+    public bool IsStaggered => _currentState == EnemyAIState.Staggered;
+    public bool IsDead => _currentState == EnemyAIState.Dead;
+
+    #endregion
 
     #region Unity Callbacks
 
@@ -49,42 +100,121 @@ public class EnemyAI : MonoBehaviour
     {
         _agent = GetComponent<NavMeshAgent>();
         _health = GetComponent<Health>();
+        _animator = GetComponent<Animator>();
+        _aggro = GetComponent<AggroSystem>();
+        _spawnPosition = transform.position;
     }
 
     private void Start()
     {
-        // Find player
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-        {
-            _player = playerObj.transform;
-        }
-
-        // Subscribe to death event
-        _health.OnDeath += HandleDeath;
-
-        // Start patrolling if patrol points exist
-        if (_patrolPoints != null && _patrolPoints.Length > 0)
-        {
-            _currentState = AIState.Patrol;
-            SetDestination(_patrolPoints[0].position);
-        }
+        InitializeFromData();
+        SubscribeToEvents();
+        StartPatrolOrIdle();
     }
 
     private void Update()
     {
-        if (_health.IsDead) return;
+        if (_currentState == EnemyAIState.Dead) return;
 
         UpdateTimers();
+        UpdatePatternCooldowns();
+        UpdateTarget();
         UpdateState();
         ExecuteState();
     }
 
     private void OnDestroy()
     {
+        UnsubscribeFromEvents();
+    }
+
+    #endregion
+
+    #region Initialization
+
+    private void InitializeFromData()
+    {
+        if (_enemyData != null)
+        {
+            _detectionRange = _enemyData.detectionRange;
+            _attackRange = _enemyData.attackRange;
+            _fieldOfView = _enemyData.fieldOfView;
+            _patrolSpeed = _enemyData.moveSpeed;
+            _chaseSpeed = _enemyData.chaseSpeed;
+            _attackDamage = _enemyData.attackDamage;
+            _attackCooldown = _enemyData.attackCooldown;
+            _damageType = _enemyData.damageType;
+            _behavior = _enemyData.baseBehavior;
+
+            // Initialize health
+            if (_health != null)
+            {
+                _health.SetMaxHealth(_enemyData.maxHealth);
+            }
+
+            // Initialize pattern cooldowns
+            if (_enemyData.attackPatterns != null)
+            {
+                foreach (var pattern in _enemyData.attackPatterns)
+                {
+                    if (pattern != null)
+                    {
+                        _patternCooldowns[pattern] = 0f;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Default values
+            _detectionRange = 10f;
+            _attackRange = 2f;
+            _fieldOfView = 120f;
+            _patrolSpeed = 2f;
+            _chaseSpeed = 4f;
+            _attackDamage = 10f;
+            _attackCooldown = 1.5f;
+            _damageType = DamageType.Physical;
+            _behavior = AIBehavior.Aggressive;
+        }
+    }
+
+    private void SubscribeToEvents()
+    {
+        if (_health != null)
+        {
+            _health.OnDeath += HandleDeath;
+            _health.OnDamaged += HandleDamageInfo;
+        }
+        if (_aggro != null)
+        {
+            _aggro.OnTargetChanged += HandleAggroTargetChanged;
+        }
+    }
+
+    private void UnsubscribeFromEvents()
+    {
         if (_health != null)
         {
             _health.OnDeath -= HandleDeath;
+            _health.OnDamaged -= HandleDamageInfo;
+        }
+        if (_aggro != null)
+        {
+            _aggro.OnTargetChanged -= HandleAggroTargetChanged;
+        }
+    }
+
+    private void StartPatrolOrIdle()
+    {
+        if (_patrolPoints != null && _patrolPoints.Length > 0)
+        {
+            ChangeState(EnemyAIState.Patrol);
+            SetDestination(_patrolPoints[0].position);
+        }
+        else
+        {
+            ChangeState(EnemyAIState.Idle);
         }
     }
 
@@ -92,72 +222,351 @@ public class EnemyAI : MonoBehaviour
 
     #region State Machine
 
-    private void UpdateState()
+    private void ChangeState(EnemyAIState newState)
     {
-        if (_player == null) return;
+        if (_currentState == newState) return;
 
-        float distanceToPlayer = Vector3.Distance(transform.position, _player.position);
-        bool canSeePlayer = CanSeePlayer();
+        _previousState = _currentState;
+        _currentState = newState;
 
-        // State transitions
-        switch (_currentState)
+        // Animation triggers
+        if (_animator != null)
         {
-            case AIState.Idle:
-            case AIState.Patrol:
-                if (canSeePlayer && distanceToPlayer <= _detectionRange)
-                {
-                    _currentState = AIState.Chase;
-                    _agent.speed = _chaseSpeed;
-                }
-                break;
-
-            case AIState.Chase:
-                if (!canSeePlayer || distanceToPlayer > _detectionRange * 1.5f)
-                {
-                    // Lost sight of player, return to patrol
-                    _currentState = _patrolPoints.Length > 0 ? AIState.Patrol : AIState.Idle;
-                    _agent.speed = _patrolSpeed;
-                }
-                else if (distanceToPlayer <= _attackRange)
-                {
-                    _currentState = AIState.Attack;
-                }
-                break;
-
-            case AIState.Attack:
-                if (distanceToPlayer > _attackRange * 1.2f)
-                {
-                    _currentState = AIState.Chase;
-                }
-                break;
+            _animator.SetInteger("State", (int)newState);
         }
     }
 
-    private void ExecuteState()
+    private void UpdateTarget()
     {
-        switch (_currentState)
+        // Use aggro system if available
+        if (_aggro != null && _aggro.HasTargets)
         {
-            case AIState.Idle:
-                _agent.isStopped = true;
-                break;
+            var aggroTarget = _aggro.CurrentTarget;
+            if (aggroTarget != null)
+            {
+                _currentTarget = aggroTarget.transform;
+                return;
+            }
+        }
 
-            case AIState.Patrol:
-                ExecutePatrol();
-                break;
+        // Fallback: find player
+        if (_currentTarget == null)
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null && CanSeeTarget(player.transform))
+            {
+                _currentTarget = player.transform;
+            }
+        }
+    }
 
-            case AIState.Chase:
-                ExecuteChase();
-                break;
+    private void UpdateState()
+    {
+        // Don't update state while staggered
+        if (_currentState == EnemyAIState.Staggered)
+        {
+            if (Time.time >= _staggerEndTime)
+            {
+                ChangeState(_previousState != EnemyAIState.Staggered ? _previousState : EnemyAIState.Idle);
+            }
+            return;
+        }
 
-            case AIState.Attack:
-                ExecuteAttack();
+        // Behavior-specific state transitions
+        switch (_behavior)
+        {
+            case AIBehavior.Aggressive:
+                UpdateAggressiveState();
+                break;
+            case AIBehavior.Defensive:
+                UpdateDefensiveState();
+                break;
+            case AIBehavior.Cowardly:
+                UpdateCowardlyState();
+                break;
+            case AIBehavior.Ranged:
+                UpdateRangedState();
+                break;
+            case AIBehavior.Support:
+                UpdateSupportState();
+                break;
+            case AIBehavior.Scout:
+                UpdateScoutState();
+                break;
+            default:
+                UpdateAggressiveState();
                 break;
         }
     }
 
     #endregion
 
-    #region Behaviors
+    #region Behavior Updates
+
+    private void UpdateAggressiveState()
+    {
+        float distanceToTarget = _currentTarget != null
+            ? Vector3.Distance(transform.position, _currentTarget.position)
+            : float.MaxValue;
+        bool canSeeTarget = _currentTarget != null && CanSeeTarget(_currentTarget);
+
+        switch (_currentState)
+        {
+            case EnemyAIState.Idle:
+            case EnemyAIState.Patrol:
+                if (canSeeTarget && distanceToTarget <= _detectionRange)
+                {
+                    ChangeState(EnemyAIState.Chase);
+                    _agent.speed = _chaseSpeed;
+                }
+                break;
+
+            case EnemyAIState.Chase:
+                if (!canSeeTarget || distanceToTarget > _detectionRange * 1.5f)
+                {
+                    ChangeState(EnemyAIState.Return);
+                }
+                else if (distanceToTarget <= _attackRange)
+                {
+                    ChangeState(EnemyAIState.Combat);
+                }
+                break;
+
+            case EnemyAIState.Combat:
+                if (_currentTarget == null || distanceToTarget > _attackRange * 1.5f)
+                {
+                    ChangeState(EnemyAIState.Chase);
+                }
+                break;
+
+            case EnemyAIState.Return:
+                float distanceToSpawn = Vector3.Distance(transform.position, _spawnPosition);
+                if (distanceToSpawn < 1f)
+                {
+                    _currentTarget = null;
+                    ChangeState(_patrolPoints.Length > 0 ? EnemyAIState.Patrol : EnemyAIState.Idle);
+                    _agent.speed = _patrolSpeed;
+                }
+                else if (canSeeTarget && distanceToTarget <= _detectionRange)
+                {
+                    ChangeState(EnemyAIState.Chase);
+                    _agent.speed = _chaseSpeed;
+                }
+                break;
+        }
+    }
+
+    private void UpdateDefensiveState()
+    {
+        float distanceToTarget = _currentTarget != null
+            ? Vector3.Distance(transform.position, _currentTarget.position)
+            : float.MaxValue;
+        bool canSeeTarget = _currentTarget != null && CanSeeTarget(_currentTarget);
+        float healthPercent = _health != null ? _health.CurrentHealth / _health.MaxHealth : 1f;
+
+        switch (_currentState)
+        {
+            case EnemyAIState.Idle:
+            case EnemyAIState.Patrol:
+                if (canSeeTarget && distanceToTarget <= _detectionRange)
+                {
+                    // Defensive: wait for target to get close before chasing
+                    if (distanceToTarget <= _attackRange * 2f)
+                    {
+                        ChangeState(EnemyAIState.Combat);
+                    }
+                }
+                break;
+
+            case EnemyAIState.Combat:
+                // Flee if low health
+                if (healthPercent < _lowHealthPercent)
+                {
+                    ChangeState(EnemyAIState.Flee);
+                }
+                else if (_currentTarget == null || distanceToTarget > _attackRange * 2f)
+                {
+                    ChangeState(EnemyAIState.Return);
+                }
+                break;
+
+            case EnemyAIState.Flee:
+                float fleeDistanceValue = _enemyData != null ? _enemyData.fleeDistance : 15f;
+                if (distanceToTarget > fleeDistanceValue || healthPercent > _lowHealthPercent * 1.5f)
+                {
+                    ChangeState(EnemyAIState.Return);
+                }
+                break;
+
+            case EnemyAIState.Return:
+                float distanceToSpawn = Vector3.Distance(transform.position, _spawnPosition);
+                if (distanceToSpawn < 1f)
+                {
+                    _currentTarget = null;
+                    ChangeState(EnemyAIState.Idle);
+                }
+                break;
+        }
+    }
+
+    private void UpdateCowardlyState()
+    {
+        float distanceToTarget = _currentTarget != null
+            ? Vector3.Distance(transform.position, _currentTarget.position)
+            : float.MaxValue;
+        bool canSeeTarget = _currentTarget != null && CanSeeTarget(_currentTarget);
+
+        switch (_currentState)
+        {
+            case EnemyAIState.Idle:
+            case EnemyAIState.Patrol:
+                if (canSeeTarget && distanceToTarget <= _detectionRange)
+                {
+                    ChangeState(EnemyAIState.Flee);
+                    _agent.speed = _chaseSpeed;
+                }
+                break;
+
+            case EnemyAIState.Flee:
+                float cowardFleeDistance = _enemyData != null ? _enemyData.fleeDistance : 15f;
+                if (!canSeeTarget || distanceToTarget > cowardFleeDistance)
+                {
+                    ChangeState(EnemyAIState.Return);
+                    _agent.speed = _patrolSpeed;
+                }
+                break;
+
+            case EnemyAIState.Return:
+                float distanceToSpawn = Vector3.Distance(transform.position, _spawnPosition);
+                if (distanceToSpawn < 1f)
+                {
+                    _currentTarget = null;
+                    ChangeState(_patrolPoints.Length > 0 ? EnemyAIState.Patrol : EnemyAIState.Idle);
+                }
+                else if (canSeeTarget && distanceToTarget <= _detectionRange * 0.5f)
+                {
+                    ChangeState(EnemyAIState.Flee);
+                    _agent.speed = _chaseSpeed;
+                }
+                break;
+        }
+    }
+
+    private void UpdateRangedState()
+    {
+        float distanceToTarget = _currentTarget != null
+            ? Vector3.Distance(transform.position, _currentTarget.position)
+            : float.MaxValue;
+        bool canSeeTarget = _currentTarget != null && CanSeeTarget(_currentTarget);
+        float optimalRange = _attackRange * 0.7f;
+
+        switch (_currentState)
+        {
+            case EnemyAIState.Idle:
+            case EnemyAIState.Patrol:
+                if (canSeeTarget && distanceToTarget <= _detectionRange)
+                {
+                    ChangeState(EnemyAIState.Chase);
+                    _agent.speed = _chaseSpeed;
+                }
+                break;
+
+            case EnemyAIState.Chase:
+                if (!canSeeTarget || distanceToTarget > _detectionRange * 1.5f)
+                {
+                    ChangeState(EnemyAIState.Return);
+                }
+                else if (distanceToTarget <= _attackRange && distanceToTarget >= optimalRange)
+                {
+                    ChangeState(EnemyAIState.Combat);
+                }
+                break;
+
+            case EnemyAIState.Combat:
+                if (_currentTarget == null)
+                {
+                    ChangeState(EnemyAIState.Return);
+                }
+                else if (distanceToTarget < optimalRange)
+                {
+                    // Too close, back up
+                    ChangeState(EnemyAIState.Flee);
+                }
+                else if (distanceToTarget > _attackRange)
+                {
+                    ChangeState(EnemyAIState.Chase);
+                }
+                break;
+
+            case EnemyAIState.Flee:
+                if (distanceToTarget >= optimalRange)
+                {
+                    ChangeState(EnemyAIState.Combat);
+                }
+                break;
+
+            case EnemyAIState.Return:
+                float distanceToSpawn = Vector3.Distance(transform.position, _spawnPosition);
+                if (distanceToSpawn < 1f)
+                {
+                    _currentTarget = null;
+                    ChangeState(_patrolPoints.Length > 0 ? EnemyAIState.Patrol : EnemyAIState.Idle);
+                    _agent.speed = _patrolSpeed;
+                }
+                break;
+        }
+    }
+
+    private void UpdateSupportState()
+    {
+        // Support enemies prioritize helping allies
+        // Simplified version: acts like defensive
+        UpdateDefensiveState();
+    }
+
+    private void UpdateScoutState()
+    {
+        // Scouts alert other enemies and flee
+        // Simplified version: acts like cowardly but faster
+        UpdateCowardlyState();
+    }
+
+    #endregion
+
+    #region State Execution
+
+    private void ExecuteState()
+    {
+        switch (_currentState)
+        {
+            case EnemyAIState.Idle:
+                ExecuteIdle();
+                break;
+            case EnemyAIState.Patrol:
+                ExecutePatrol();
+                break;
+            case EnemyAIState.Chase:
+                ExecuteChase();
+                break;
+            case EnemyAIState.Combat:
+                ExecuteCombat();
+                break;
+            case EnemyAIState.Flee:
+                ExecuteFlee();
+                break;
+            case EnemyAIState.Return:
+                ExecuteReturn();
+                break;
+            case EnemyAIState.Staggered:
+                ExecuteStaggered();
+                break;
+        }
+    }
+
+    private void ExecuteIdle()
+    {
+        _agent.isStopped = true;
+    }
 
     private void ExecutePatrol()
     {
@@ -166,14 +575,11 @@ public class EnemyAI : MonoBehaviour
         _agent.isStopped = false;
         _agent.speed = _patrolSpeed;
 
-        // Check if reached patrol point
         if (!_agent.pathPending && _agent.remainingDistance < 0.5f)
         {
             _waitTimer -= Time.deltaTime;
-
             if (_waitTimer <= 0)
             {
-                // Move to next patrol point
                 _currentPatrolIndex = (_currentPatrolIndex + 1) % _patrolPoints.Length;
                 SetDestination(_patrolPoints[_currentPatrolIndex].position);
                 _waitTimer = _patrolWaitTime;
@@ -183,33 +589,40 @@ public class EnemyAI : MonoBehaviour
 
     private void ExecuteChase()
     {
-        if (_player == null) return;
+        if (_currentTarget == null) return;
 
         _agent.isStopped = false;
         _agent.speed = _chaseSpeed;
-        SetDestination(_player.position);
+        SetDestination(_currentTarget.position);
     }
 
-    private void ExecuteAttack()
+    private void ExecuteCombat()
     {
-        _agent.isStopped = true;
+        // Face the target
+        FaceTarget();
 
-        // Face the player
-        if (_player != null)
+        // For ranged: don't stop, maintain distance
+        if (_behavior == AIBehavior.Ranged)
         {
-            Vector3 direction = (_player.position - transform.position).normalized;
-            direction.y = 0;
-            if (direction.sqrMagnitude > 0.01f)
+            _agent.isStopped = false;
+            // Circle strafe or maintain position
+            if (_currentTarget != null)
             {
-                transform.rotation = Quaternion.Slerp(
-                    transform.rotation,
-                    Quaternion.LookRotation(direction),
-                    10f * Time.deltaTime
-                );
+                float distance = Vector3.Distance(transform.position, _currentTarget.position);
+                float optimalRange = _attackRange * 0.7f;
+                if (Mathf.Abs(distance - optimalRange) > 1f)
+                {
+                    Vector3 direction = (transform.position - _currentTarget.position).normalized;
+                    SetDestination(transform.position + direction * (optimalRange - distance));
+                }
             }
         }
+        else
+        {
+            _agent.isStopped = true;
+        }
 
-        // Attack when cooldown is ready
+        // Attack when ready
         if (_attackTimer <= 0)
         {
             PerformAttack();
@@ -217,33 +630,245 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
+    private void ExecuteFlee()
+    {
+        if (_currentTarget == null)
+        {
+            ChangeState(EnemyAIState.Return);
+            return;
+        }
+
+        _agent.isStopped = false;
+        _agent.speed = _chaseSpeed * 1.2f; // Run faster when fleeing
+
+        // Run away from target
+        Vector3 fleeDirection = (transform.position - _currentTarget.position).normalized;
+        Vector3 fleeDestination = transform.position + fleeDirection * 10f;
+        SetDestination(fleeDestination);
+    }
+
+    private void ExecuteReturn()
+    {
+        _agent.isStopped = false;
+        _agent.speed = _patrolSpeed;
+        SetDestination(_spawnPosition);
+    }
+
+    private void ExecuteStaggered()
+    {
+        _agent.isStopped = true;
+        // Animation handles the stagger visual
+    }
+
+    #endregion
+
+    #region Combat
+
     private void PerformAttack()
     {
-        if (_player == null) return;
+        if (_currentTarget == null) return;
 
-        // Check if player is still in range
-        float distance = Vector3.Distance(transform.position, _player.position);
+        float distance = Vector3.Distance(transform.position, _currentTarget.position);
         if (distance > _attackRange) return;
 
-        // Creer les infos de degats
-        var damageInfo = new DamageInfo
+        // Try to use attack pattern
+        var pattern = SelectAttackPattern();
+        if (pattern != null && pattern.AttackCount > 0)
         {
-            baseDamage = _attackDamage,
-            damageType = _damageType,
-            attacker = gameObject,
-            hitPoint = _player.position
-        };
-
-        // Appliquer les degats au joueur
-        if (_player.TryGetComponent<IDamageable>(out var damageable))
-        {
-            damageable.TakeDamage(damageInfo);
-            Debug.Log($"{gameObject.name} attacked player for {_attackDamage} damage!");
+            ExecutePatternAttack(pattern);
         }
-        else if (_player.TryGetComponent<PlayerStats>(out var stats))
+        else
         {
-            stats.TakeDamage(_attackDamage);
-            Debug.Log($"{gameObject.name} attacked player for {_attackDamage} damage!");
+            // Fallback to basic attack
+            ExecuteBasicAttack();
+        }
+
+        // Play attack sound
+        PlayAttackSound();
+    }
+
+    private AttackPattern SelectAttackPattern()
+    {
+        if (_enemyData?.attackPatterns == null) return null;
+
+        float healthPercent = _health != null ? _health.CurrentHealth / _health.MaxHealth : 1f;
+        float distanceToTarget = _currentTarget != null
+            ? Vector3.Distance(transform.position, _currentTarget.position)
+            : 0f;
+
+        // Find available patterns
+        var availablePatterns = new List<AttackPattern>();
+        float totalWeight = 0f;
+
+        foreach (var pattern in _enemyData.attackPatterns)
+        {
+            if (pattern == null) continue;
+
+            float cooldown = _patternCooldowns.ContainsKey(pattern) ? _patternCooldowns[pattern] : 0f;
+            if (pattern.CanUse(healthPercent, distanceToTarget, cooldown))
+            {
+                availablePatterns.Add(pattern);
+                totalWeight += pattern.weight;
+            }
+        }
+
+        if (availablePatterns.Count == 0) return null;
+
+        // Sort by priority, then select weighted random
+        availablePatterns.Sort((a, b) => b.priority.CompareTo(a.priority));
+
+        // If highest priority has multiple, select by weight
+        int highestPriority = availablePatterns[0].priority;
+        var topPriorityPatterns = availablePatterns.FindAll(p => p.priority == highestPriority);
+
+        if (topPriorityPatterns.Count == 1)
+        {
+            return topPriorityPatterns[0];
+        }
+
+        // Weighted random selection
+        float weight = Random.Range(0f, topPriorityPatterns.Count);
+        float cumulative = 0f;
+        foreach (var pattern in topPriorityPatterns)
+        {
+            cumulative += pattern.weight;
+            if (weight <= cumulative)
+            {
+                return pattern;
+            }
+        }
+
+        return topPriorityPatterns[0];
+    }
+
+    private void ExecutePatternAttack(AttackPattern pattern)
+    {
+        _currentPattern = pattern;
+        _currentAttackIndex = 0;
+
+        var attack = pattern.GetAttack(0);
+        if (attack != null)
+        {
+            ExecuteAttackData(attack);
+        }
+
+        // Set cooldown
+        _patternCooldowns[pattern] = pattern.cooldown;
+    }
+
+    private void ExecuteAttackData(AttackData attack)
+    {
+        if (_currentTarget == null) return;
+
+        // For ranged behavior, fire projectile
+        if (_behavior == AIBehavior.Ranged && _projectilePrefab != null)
+        {
+            FireProjectile(attack);
+        }
+        else
+        {
+            // Melee attack
+            var damageInfo = attack.CreateDamageInfo(gameObject);
+            damageInfo.hitPoint = _currentTarget.position;
+
+            if (_currentTarget.TryGetComponent<IDamageable>(out var damageable))
+            {
+                damageable.TakeDamage(damageInfo);
+            }
+        }
+
+        // Trigger animation
+        if (_animator != null && !string.IsNullOrEmpty(attack.animationTrigger))
+        {
+            _animator.SetTrigger(attack.animationTrigger);
+        }
+    }
+
+    private void ExecuteBasicAttack()
+    {
+        if (_currentTarget == null) return;
+
+        // Create damage info
+        DamageInfo damageInfo;
+        if (_enemyData != null)
+        {
+            damageInfo = _enemyData.CreateDamageInfo(gameObject, _currentTarget.position);
+        }
+        else
+        {
+            damageInfo = new DamageInfo
+            {
+                baseDamage = _attackDamage,
+                damageType = _damageType,
+                attacker = gameObject,
+                hitPoint = _currentTarget.position
+            };
+        }
+
+        // For ranged behavior, fire projectile
+        if (_behavior == AIBehavior.Ranged && _projectilePrefab != null)
+        {
+            FireProjectile(damageInfo);
+        }
+        else
+        {
+            // Apply damage to target
+            if (_currentTarget.TryGetComponent<IDamageable>(out var damageable))
+            {
+                damageable.TakeDamage(damageInfo);
+            }
+            else if (_currentTarget.TryGetComponent<PlayerStats>(out var stats))
+            {
+                stats.TakeDamage(_attackDamage);
+            }
+        }
+
+        // Trigger animation
+        if (_animator != null)
+        {
+            _animator.SetTrigger("Attack");
+        }
+    }
+
+    private void FireProjectile(AttackData attack)
+    {
+        FireProjectile(attack.CreateDamageInfo(gameObject));
+    }
+
+    private void FireProjectile(DamageInfo damageInfo)
+    {
+        if (_projectilePrefab == null || _currentTarget == null) return;
+
+        var spawnPoint = _projectileSpawnPoint != null ? _projectileSpawnPoint : transform;
+        var projectile = Instantiate(_projectilePrefab, spawnPoint.position, spawnPoint.rotation);
+
+        // Calculate direction to target
+        Vector3 direction = (_currentTarget.position - spawnPoint.position).normalized;
+
+        // Setup projectile
+        if (projectile.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.linearVelocity = direction * _projectileSpeed;
+        }
+
+        // Setup damage on projectile if it has a damage component
+        if (projectile.TryGetComponent<Projectile>(out var proj))
+        {
+            proj.Initialize(_currentTarget, _projectileSpeed, damageInfo);
+        }
+
+        // Destroy after time
+        Destroy(projectile, 10f);
+    }
+
+    private void PlayAttackSound()
+    {
+        if (_enemyData?.attackSounds == null || _enemyData.attackSounds.Length == 0) return;
+
+        var sound = _enemyData.attackSounds[Random.Range(0, _enemyData.attackSounds.Length)];
+        if (sound != null)
+        {
+            AudioSource.PlayClipAtPoint(sound, transform.position);
         }
     }
 
@@ -251,23 +876,23 @@ public class EnemyAI : MonoBehaviour
 
     #region Detection
 
-    private bool CanSeePlayer()
+    private bool CanSeeTarget(Transform target)
     {
-        if (_player == null) return false;
+        if (target == null) return false;
 
-        Vector3 directionToPlayer = (_player.position - transform.position).normalized;
-        float distanceToPlayer = Vector3.Distance(transform.position, _player.position);
+        Vector3 directionToTarget = (target.position - transform.position).normalized;
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
 
-        // Check if in detection range
-        if (distanceToPlayer > _detectionRange) return false;
+        // Check range
+        if (distanceToTarget > _detectionRange) return false;
 
-        // Check if in field of view
-        float angle = Vector3.Angle(transform.forward, directionToPlayer);
+        // Check FOV
+        float angle = Vector3.Angle(transform.forward, directionToTarget);
         if (angle > _fieldOfView / 2f) return false;
 
-        // Check for obstacles
+        // Check obstacles
         Vector3 rayStart = transform.position + Vector3.up;
-        Vector3 rayEnd = _player.position + Vector3.up;
+        Vector3 rayEnd = target.position + Vector3.up;
         if (Physics.Linecast(rayStart, rayEnd, _obstacleLayer))
         {
             return false;
@@ -278,7 +903,81 @@ public class EnemyAI : MonoBehaviour
 
     #endregion
 
+    #region Event Handlers
+
+    private void HandleDeath()
+    {
+        ChangeState(EnemyAIState.Dead);
+        _agent.isStopped = true;
+        enabled = false;
+
+        // Play death sound
+        if (_enemyData?.deathSound != null)
+        {
+            AudioSource.PlayClipAtPoint(_enemyData.deathSound, transform.position);
+        }
+    }
+
+    private void HandleDamageInfo(DamageInfo damageInfo)
+    {
+        float damage = damageInfo.baseDamage;
+
+        // Add to aggro if we have a system
+        if (_aggro != null && damageInfo.attacker != null)
+        {
+            _aggro.AddThreat(damageInfo.attacker, damage);
+        }
+
+        // Accumulate stagger
+        _staggerAccumulator += damageInfo.staggerValue > 0 ? damageInfo.staggerValue : damage;
+        _staggerRecoveryTimer = _staggerRecoveryTime;
+
+        if (_staggerAccumulator >= _staggerThreshold && _currentState != EnemyAIState.Staggered)
+        {
+            ApplyStagger();
+        }
+    }
+
+    private void HandleAggroTargetChanged(GameObject oldTarget, GameObject newTarget)
+    {
+        _currentTarget = newTarget?.transform;
+    }
+
+    #endregion
+
+    #region Stagger
+
+    public void ApplyStagger()
+    {
+        _staggerAccumulator = 0f;
+        _staggerEndTime = Time.time + _staggerDuration;
+        ChangeState(EnemyAIState.Staggered);
+
+        if (_animator != null)
+        {
+            _animator.SetTrigger("Stagger");
+        }
+    }
+
+    #endregion
+
     #region Helpers
+
+    private void FaceTarget()
+    {
+        if (_currentTarget == null) return;
+
+        Vector3 direction = (_currentTarget.position - transform.position).normalized;
+        direction.y = 0;
+        if (direction.sqrMagnitude > 0.01f)
+        {
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                Quaternion.LookRotation(direction),
+                10f * Time.deltaTime
+            );
+        }
+    }
 
     private void SetDestination(Vector3 destination)
     {
@@ -294,13 +993,28 @@ public class EnemyAI : MonoBehaviour
         {
             _attackTimer -= Time.deltaTime;
         }
+
+        // Stagger recovery
+        if (_staggerRecoveryTimer > 0)
+        {
+            _staggerRecoveryTimer -= Time.deltaTime;
+            if (_staggerRecoveryTimer <= 0)
+            {
+                _staggerAccumulator = 0f;
+            }
+        }
     }
 
-    private void HandleDeath()
+    private void UpdatePatternCooldowns()
     {
-        _agent.isStopped = true;
-        enabled = false;
-        // Add death effects, loot drops, etc. here
+        var keys = new List<AttackPattern>(_patternCooldowns.Keys);
+        foreach (var key in keys)
+        {
+            if (_patternCooldowns[key] > 0)
+            {
+                _patternCooldowns[key] -= Time.deltaTime;
+            }
+        }
     }
 
     #endregion
@@ -311,16 +1025,18 @@ public class EnemyAI : MonoBehaviour
     {
         // Detection range
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, _detectionRange);
+        Gizmos.DrawWireSphere(transform.position, _enemyData != null ? _enemyData.detectionRange : _detectionRange);
 
         // Attack range
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, _attackRange);
+        Gizmos.DrawWireSphere(transform.position, _enemyData != null ? _enemyData.attackRange : _attackRange);
 
         // Field of view
+        float fov = _enemyData != null ? _enemyData.fieldOfView : _fieldOfView;
+        float range = _enemyData != null ? _enemyData.detectionRange : _detectionRange;
         Gizmos.color = Color.blue;
-        Vector3 leftBound = Quaternion.Euler(0, -_fieldOfView / 2f, 0) * transform.forward * _detectionRange;
-        Vector3 rightBound = Quaternion.Euler(0, _fieldOfView / 2f, 0) * transform.forward * _detectionRange;
+        Vector3 leftBound = Quaternion.Euler(0, -fov / 2f, 0) * transform.forward * range;
+        Vector3 rightBound = Quaternion.Euler(0, fov / 2f, 0) * transform.forward * range;
         Gizmos.DrawLine(transform.position, transform.position + leftBound);
         Gizmos.DrawLine(transform.position, transform.position + rightBound);
 
@@ -336,6 +1052,10 @@ public class EnemyAI : MonoBehaviour
                 }
             }
         }
+
+        // Spawn position
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireCube(_spawnPosition != Vector3.zero ? _spawnPosition : transform.position, Vector3.one * 0.5f);
     }
 
     #endregion

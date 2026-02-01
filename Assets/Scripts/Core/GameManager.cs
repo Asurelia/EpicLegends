@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -21,6 +22,9 @@ public class GameManager : MonoBehaviour
     // Player reference
     private PlayerStats _playerStats;
 
+    // Input System
+    private InputAction _cancelAction;
+
     #region Unity Callbacks
 
     private void Awake()
@@ -33,21 +37,40 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+
+        // DontDestroyOnLoad only works for root GameObjects
+        if (Application.isPlaying)
+        {
+            // Detach from parent to make this a root object
+            transform.SetParent(null);
+            DontDestroyOnLoad(gameObject);
+        }
     }
 
     private void Start()
     {
         FindPlayer();
+        SetupInputActions();
     }
 
-    private void Update()
+    private void OnEnable()
     {
-        // Toggle pause with Escape
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            TogglePause();
-        }
+        _cancelAction?.Enable();
+    }
+
+    private void OnDisable()
+    {
+        _cancelAction?.Disable();
+    }
+
+    private void SetupInputActions()
+    {
+        // Create escape/cancel action for pause
+        _cancelAction = new InputAction("Cancel", InputActionType.Button);
+        _cancelAction.AddBinding("<Keyboard>/escape");
+        _cancelAction.AddBinding("<Gamepad>/start");
+        _cancelAction.performed += _ => TogglePause();
+        _cancelAction.Enable();
     }
 
     #endregion
@@ -138,6 +161,26 @@ public class GameManager : MonoBehaviour
     #region Properties
 
     public bool IsPaused => _isPaused;
+
+    /// <summary>
+    /// Reference au GameObject du joueur.
+    /// </summary>
+    public GameObject Player
+    {
+        get
+        {
+            if (_playerStats != null)
+                return _playerStats.gameObject;
+
+            // Recherche fallback
+            return GameObject.FindGameObjectWithTag("Player");
+        }
+    }
+
+    /// <summary>
+    /// Reference aux stats du joueur.
+    /// </summary>
+    public PlayerStats PlayerStats => _playerStats;
 
     #endregion
 }

@@ -501,6 +501,230 @@ public class Inventory : MonoBehaviour
 
     #endregion
 
+    #region Public Methods - Currency
+
+    private int _gold = 0;
+
+    /// <summary>
+    /// Or du joueur.
+    /// </summary>
+    public int Gold
+    {
+        get => _gold;
+        set
+        {
+            if (value < 0) value = 0;
+            _gold = value;
+            OnInventoryChanged?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Ajoute de l'or.
+    /// </summary>
+    public void AddGold(int amount)
+    {
+        if (amount > 0)
+        {
+            Gold += amount;
+        }
+    }
+
+    /// <summary>
+    /// Retire de l'or.
+    /// </summary>
+    /// <returns>True si l'or a pu etre retire.</returns>
+    public bool RemoveGold(int amount)
+    {
+        if (amount <= 0) return true;
+        if (_gold < amount) return false;
+
+        Gold -= amount;
+        return true;
+    }
+
+    #endregion
+
+    #region Public Methods - Convenience
+
+    /// <summary>
+    /// Ajoute un item a l'inventaire (version simplifiee).
+    /// </summary>
+    /// <returns>True si l'item a ete ajoute completement</returns>
+    public bool AddItem(ItemData data, int quantity = 1)
+    {
+        return TryAddItem(data, quantity) == 0;
+    }
+
+    /// <summary>
+    /// Compte le nombre d'items par ID.
+    /// </summary>
+    public int GetItemCount(string itemId)
+    {
+        EnsureInitialized();
+        if (string.IsNullOrEmpty(itemId)) return 0;
+
+        int count = 0;
+        foreach (var item in _items)
+        {
+            if (item != null && item.Data != null && item.Data.itemId == itemId)
+            {
+                count += item.Quantity;
+            }
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Vide completement l'inventaire.
+    /// </summary>
+    public void Clear()
+    {
+        EnsureInitialized();
+
+        for (int i = 0; i < _items.Count; i++)
+        {
+            if (_items[i] != null)
+            {
+                OnItemRemoved?.Invoke(_items[i], i);
+                _items[i] = null;
+            }
+        }
+
+        _gold = 0;
+        OnInventoryChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Retire des items par leur ID.
+    /// </summary>
+    /// <returns>True si la quantite demandee a ete retiree</returns>
+    public bool RemoveItemById(string itemId, int quantity = 1)
+    {
+        EnsureInitialized();
+        if (string.IsNullOrEmpty(itemId) || quantity <= 0) return false;
+
+        int remaining = quantity;
+
+        for (int i = 0; i < _items.Count && remaining > 0; i++)
+        {
+            var item = _items[i];
+            if (item == null || item.Data == null) continue;
+            if (item.Data.itemId != itemId) continue;
+
+            if (item.Quantity <= remaining)
+            {
+                remaining -= item.Quantity;
+                _items[i] = null;
+                OnItemRemoved?.Invoke(item, i);
+            }
+            else
+            {
+                item.Remove(remaining);
+                remaining = 0;
+            }
+        }
+
+        if (remaining < quantity)
+        {
+            OnInventoryChanged?.Invoke();
+        }
+
+        return remaining == 0;
+    }
+
+    #endregion
+
+    #region Save/Load
+
+    /// <summary>
+    /// Definit le montant d'or directement.
+    /// </summary>
+    public void SetGold(int amount)
+    {
+        _gold = Mathf.Max(0, amount);
+        OnInventoryChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Charge les donnees de sauvegarde.
+    /// </summary>
+    public void LoadSaveData(InventorySaveData data, ItemData[] allItems)
+    {
+        if (data == null || allItems == null) return;
+
+        EnsureInitialized();
+        Clear();
+
+        // Restaurer l'or
+        _gold = data.gold;
+
+        // Restaurer les items
+        foreach (var itemSave in data.items)
+        {
+            if (string.IsNullOrEmpty(itemSave.itemId)) continue;
+
+            var itemData = System.Array.Find(allItems, i => i.itemId == itemSave.itemId);
+            if (itemData == null)
+            {
+                Debug.LogWarning($"[Inventory] Item not found in database: {itemSave.itemId}");
+                continue;
+            }
+
+            // Creer l'instance
+            var instance = new ItemInstance(itemData, itemSave.quantity);
+
+            // Placer dans le slot specifique si possible
+            if (itemSave.slotIndex >= 0 && itemSave.slotIndex < _items.Count && _items[itemSave.slotIndex] == null)
+            {
+                _items[itemSave.slotIndex] = instance;
+                OnItemAdded?.Invoke(instance, itemSave.slotIndex);
+            }
+            else
+            {
+                // Trouver un slot libre
+                TryAddItemInstance(instance);
+            }
+        }
+
+        OnInventoryChanged?.Invoke();
+        Debug.Log($"[Inventory] Loaded {data.items.Count} items, {data.gold} gold");
+    }
+
+    /// <summary>
+    /// Obtient les donnees de sauvegarde.
+    /// </summary>
+    public InventorySaveData GetSaveData()
+    {
+        EnsureInitialized();
+
+        var data = new InventorySaveData
+        {
+            capacity = _capacity,
+            gold = _gold,
+            items = new System.Collections.Generic.List<ItemSaveData>()
+        };
+
+        for (int i = 0; i < _items.Count; i++)
+        {
+            var item = _items[i];
+            if (item != null && item.Data != null)
+            {
+                data.items.Add(new ItemSaveData
+                {
+                    itemId = item.Data.itemId,
+                    quantity = item.Quantity,
+                    slotIndex = i,
+                    instanceId = item.InstanceId
+                });
+            }
+        }
+
+        return data;
+    }
+
+    #endregion
+
     #region Private Methods
 
     private bool IsValidSlot(int slot)

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Gestionnaire de placement de batiments.
@@ -29,6 +30,11 @@ public class BuildingPlacer : MonoBehaviour
     private int _currentRotationIndex = 0;
     private bool _canPlace = false;
     private Vector2Int _currentGridPosition;
+
+    // Input
+    private InputAction _rotateAction;
+    private InputAction _placeAction;
+    private InputAction _cancelAction;
 
     #endregion
 
@@ -61,6 +67,41 @@ public class BuildingPlacer : MonoBehaviour
 
         _currentRotation = 0;
         _currentRotationIndex = 0;
+
+        SetupInputActions();
+    }
+
+    private void OnEnable()
+    {
+        _rotateAction?.Enable();
+        _placeAction?.Enable();
+        _cancelAction?.Enable();
+    }
+
+    private void OnDisable()
+    {
+        _rotateAction?.Disable();
+        _placeAction?.Disable();
+        _cancelAction?.Disable();
+    }
+
+    private void SetupInputActions()
+    {
+        _rotateAction = new InputAction("BuildingRotate", InputActionType.Button);
+        _rotateAction.AddBinding("<Keyboard>/r");
+        _rotateAction.AddBinding("<Gamepad>/rightShoulder");
+        _rotateAction.performed += _ => { if (IsPlacing) RotateBuilding(); };
+
+        _placeAction = new InputAction("BuildingPlace", InputActionType.Button);
+        _placeAction.AddBinding("<Mouse>/leftButton");
+        _placeAction.AddBinding("<Gamepad>/buttonSouth");
+        _placeAction.performed += _ => { if (IsPlacing && _canPlace) TryPlace(); };
+
+        _cancelAction = new InputAction("BuildingCancel", InputActionType.Button);
+        _cancelAction.AddBinding("<Mouse>/rightButton");
+        _cancelAction.AddBinding("<Keyboard>/escape");
+        _cancelAction.AddBinding("<Gamepad>/buttonEast");
+        _cancelAction.performed += _ => { if (IsPlacing) CancelPlacement(); };
     }
 
     private void Update()
@@ -68,7 +109,6 @@ public class BuildingPlacer : MonoBehaviour
         if (!IsPlacing) return;
 
         UpdatePreviewPosition();
-        HandleInput();
     }
 
     #endregion
@@ -235,7 +275,8 @@ public class BuildingPlacer : MonoBehaviour
     {
         if (_previewObject == null || _camera == null) return;
 
-        Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
+        Vector2 mousePos = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
+        Ray ray = _camera.ScreenPointToRay(mousePos);
 
         if (Physics.Raycast(ray, out RaycastHit hit, _maxPlaceDistance, _groundLayer))
         {
@@ -337,27 +378,6 @@ public class BuildingPlacer : MonoBehaviour
         }
 
         return building;
-    }
-
-    private void HandleInput()
-    {
-        // Rotation
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            RotateBuilding();
-        }
-
-        // Placement
-        if (Input.GetMouseButtonDown(0) && _canPlace)
-        {
-            TryPlace();
-        }
-
-        // Annulation
-        if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape))
-        {
-            CancelPlacement();
-        }
     }
 
     #endregion

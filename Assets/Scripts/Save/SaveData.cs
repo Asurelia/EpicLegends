@@ -32,12 +32,36 @@ public class SaveData
     /// </summary>
     public GameProgressData gameProgress;
 
+    /// <summary>
+    /// Donnees de l'arbre de competences.
+    /// </summary>
+    public SkillTreeSaveData skillTreeData;
+
+    /// <summary>
+    /// Donnees des achievements.
+    /// </summary>
+    public AchievementSaveData achievementData;
+
+    /// <summary>
+    /// Donnees de l'equipement.
+    /// </summary>
+    public EquipmentSaveData equipmentData;
+
+    /// <summary>
+    /// Donnees des quetes.
+    /// </summary>
+    public QuestSaveData questData;
+
     public SaveData()
     {
         timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         playerData = new PlayerSaveData();
         inventoryData = new InventorySaveData();
         gameProgress = new GameProgressData();
+        skillTreeData = new SkillTreeSaveData();
+        achievementData = new AchievementSaveData();
+        equipmentData = new EquipmentSaveData();
+        questData = new QuestSaveData();
     }
 }
 
@@ -235,4 +259,60 @@ public class SaveSlotInfo
         var dateTime = DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime;
         return dateTime.ToString("dd/MM/yyyy HH:mm");
     }
+}
+
+/// <summary>
+/// Donnees de sauvegarde des quetes.
+/// </summary>
+[Serializable]
+public class QuestSaveData
+{
+    /// <summary>
+    /// Quetes actives avec leur progression.
+    /// </summary>
+    public List<ActiveQuestData> activeQuests = new List<ActiveQuestData>();
+
+    /// <summary>
+    /// IDs des quetes completees.
+    /// </summary>
+    public List<string> completedQuestIds = new List<string>();
+
+    /// <summary>
+    /// IDs des quetes echouees.
+    /// </summary>
+    public List<string> failedQuestIds = new List<string>();
+}
+
+/// <summary>
+/// Donnees d'une quete active.
+/// </summary>
+[Serializable]
+public class ActiveQuestData
+{
+    public string questId;
+    public List<ObjectiveProgress> objectiveProgress = new List<ObjectiveProgress>();
+    public long startTimestamp;
+}
+
+/// <summary>
+/// Progression d'un objectif de quete.
+/// </summary>
+[Serializable]
+public class ObjectiveProgress
+{
+    public int objectiveIndex;
+    public int currentProgress;
+    public bool isCompleted;
+}
+
+/// <summary>
+/// Donnees de sauvegarde de l'equipement.
+/// </summary>
+[Serializable]
+public class EquipmentSaveData
+{
+    /// <summary>
+    /// IDs des items equipes par slot.
+    /// </summary>
+    public Dictionary<EquipmentSlot, string> equippedItemIds = new Dictionary<EquipmentSlot, string>();
 }
