@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.Profiling;
@@ -132,7 +133,7 @@ public class PerformanceProfiler : EditorWindow
         _minFPS = Mathf.Min(_minFPS, snapshot.fps);
         _maxFPS = Mathf.Max(_maxFPS, snapshot.fps);
         _averageFPS = _snapshots.Average(s => s.fps);
-        _peakMemory = Mathf.Max(_peakMemory, snapshot.usedMemory);
+        _peakMemory = Math.Max(_peakMemory, snapshot.usedMemory);
     }
 
     private void OnGUI()
@@ -414,15 +415,15 @@ public class PerformanceProfiler : EditorWindow
         // Object counts
         EditorGUILayout.LabelField("Object Statistics", EditorStyles.boldLabel);
 
-        int totalObjects = Object.FindObjectsOfType<GameObject>().Length;
-        int activeObjects = Object.FindObjectsOfType<GameObject>().Count(g => g.activeInHierarchy);
-        int meshRenderers = Object.FindObjectsOfType<MeshRenderer>().Length;
-        int skinnedMeshes = Object.FindObjectsOfType<SkinnedMeshRenderer>().Length;
-        int lights = Object.FindObjectsOfType<Light>().Length;
-        int particleSystems = Object.FindObjectsOfType<ParticleSystem>().Length;
-        int audioSources = Object.FindObjectsOfType<AudioSource>().Length;
-        int rigidBodies = Object.FindObjectsOfType<Rigidbody>().Length;
-        int colliders = Object.FindObjectsOfType<Collider>().Length;
+        int totalObjects = UnityEngine.Object.FindObjectsOfType<GameObject>().Length;
+        int activeObjects = UnityEngine.Object.FindObjectsOfType<GameObject>().Count(g => g.activeInHierarchy);
+        int meshRenderers = UnityEngine.Object.FindObjectsOfType<MeshRenderer>().Length;
+        int skinnedMeshes = UnityEngine.Object.FindObjectsOfType<SkinnedMeshRenderer>().Length;
+        int lights = UnityEngine.Object.FindObjectsOfType<Light>().Length;
+        int particleSystems = UnityEngine.Object.FindObjectsOfType<ParticleSystem>().Length;
+        int audioSources = UnityEngine.Object.FindObjectsOfType<AudioSource>().Length;
+        int rigidBodies = UnityEngine.Object.FindObjectsOfType<Rigidbody>().Length;
+        int colliders = UnityEngine.Object.FindObjectsOfType<Collider>().Length;
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField($"Total GameObjects: {totalObjects} ({activeObjects} active)");
@@ -440,7 +441,7 @@ public class PerformanceProfiler : EditorWindow
         // Material analysis
         EditorGUILayout.LabelField("Material Analysis", EditorStyles.boldLabel);
 
-        var renderers = Object.FindObjectsOfType<Renderer>();
+        var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
         var materials = new HashSet<Material>();
         var shaders = new HashSet<Shader>();
 
@@ -485,7 +486,7 @@ public class PerformanceProfiler : EditorWindow
         _issues.Clear();
 
         // Check for realtime lights
-        Light[] lights = Object.FindObjectsOfType<Light>();
+        Light[] lights = UnityEngine.Object.FindObjectsOfType<Light>();
         int realtimeLights = lights.Count(l => l.lightmapBakeType != LightmapBakeType.Baked);
         if (realtimeLights > 4)
         {
@@ -499,7 +500,7 @@ public class PerformanceProfiler : EditorWindow
         }
 
         // Check for unoptimized meshes
-        MeshFilter[] meshFilters = Object.FindObjectsOfType<MeshFilter>();
+        MeshFilter[] meshFilters = UnityEngine.Object.FindObjectsOfType<MeshFilter>();
         foreach (var mf in meshFilters)
         {
             if (mf.sharedMesh != null && mf.sharedMesh.vertexCount > 50000)
@@ -516,7 +517,7 @@ public class PerformanceProfiler : EditorWindow
         }
 
         // Check for missing LODs on large objects
-        MeshRenderer[] renderers = Object.FindObjectsOfType<MeshRenderer>();
+        MeshRenderer[] renderers = UnityEngine.Object.FindObjectsOfType<MeshRenderer>();
         foreach (var r in renderers)
         {
             MeshFilter mf = r.GetComponent<MeshFilter>();
@@ -536,7 +537,7 @@ public class PerformanceProfiler : EditorWindow
         }
 
         // Check for expensive particle systems
-        ParticleSystem[] particles = Object.FindObjectsOfType<ParticleSystem>();
+        ParticleSystem[] particles = UnityEngine.Object.FindObjectsOfType<ParticleSystem>();
         foreach (var ps in particles)
         {
             var main = ps.main;
@@ -554,7 +555,7 @@ public class PerformanceProfiler : EditorWindow
         }
 
         // Check for complex colliders
-        MeshCollider[] meshColliders = Object.FindObjectsOfType<MeshCollider>();
+        MeshCollider[] meshColliders = UnityEngine.Object.FindObjectsOfType<MeshCollider>();
         foreach (var mc in meshColliders)
         {
             if (mc.sharedMesh != null && mc.sharedMesh.vertexCount > 1000 && !mc.convex)
