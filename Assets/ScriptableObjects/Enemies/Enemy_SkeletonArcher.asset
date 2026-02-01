@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4078bd19c9ac3434ea365fb006d6a8f3, type: 3}
+  m_Name: Enemy_SkeletonArcher
+  m_EditorClassIdentifier: EpicLegends::EnemyData
+  enemyName: Squelette Archer
+  description: Un squelette arme d'un arc ancien.
+  enemyType: 0
+  baseBehavior: 0
+  prefab: {fileID: 0}
+  maxHealth: 60
+  defense: 2
+  attackDamage: 18
+  moveSpeed: 3
+  chaseSpeed: 3.5
+  detectionRange: 18
+  attackRange: 15
+  fieldOfView: 120
+  fleeDistance: 15
+  attackCooldown: 2.5
+  damageType: 0
+  staggerValue: 10
+  knockbackForce: 3
+  attackPatterns: []
+  physicalResistance: 0
+  fireResistance: 0
+  waterResistance: 0
+  iceResistance: 0
+  electricResistance: 0
+  experienceReward: 40
+  goldMin: 8
+  goldMax: 18
+  lootTable:
+    tableName: 
+    entries: []
+  attackSounds: []
+  hitSounds: []
+  deathSound: {fileID: 0}

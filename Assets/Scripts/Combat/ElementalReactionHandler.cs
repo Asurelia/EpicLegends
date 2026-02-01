@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -275,13 +276,92 @@ public class ElementalReactionHandler : MonoBehaviour
     private void CreateCrystallizeShield(float shieldValue)
     {
         OnShieldCreated?.Invoke(shieldValue);
-        // TODO: Integrer avec le systeme de shield
+
+        // Integrer avec le StatusEffectManager pour creer un vrai bouclier
+        var statusManager = GetComponent<StatusEffectManager>();
+        if (statusManager != null)
+        {
+            // Creer un effet de bouclier dynamique
+            var shieldData = ScriptableObject.CreateInstance<StatusEffectData>();
+            shieldData.effectId = "crystallize_shield";
+            shieldData.effectName = "Crystallize Shield";
+            shieldData.effectType = StatusEffectType.Shield;
+            shieldData.category = StatusEffectCategory.Buff;
+            shieldData.baseDuration = 10f; // Duree du bouclier crystallize
+            shieldData.value = shieldValue;
+            shieldData.canRefresh = true;
+            shieldData.canStack = false;
+
+            statusManager.ApplyEffect(shieldData, gameObject);
+        }
     }
 
     private void StartElectroCharged(float damage)
     {
-        // TODO: Implementer les degats sur la duree
-        // Pour l'instant, on applique juste les degats
+        // ElectroCharged applique des degats sur la duree (3 ticks sur 2 secondes)
+        StartCoroutine(ElectroChargedCoroutine(damage));
+    }
+
+    private System.Collections.IEnumerator ElectroChargedCoroutine(float totalDamage)
+    {
+        const int tickCount = 3;
+        const float tickInterval = 0.7f;
+        float damagePerTick = totalDamage / tickCount;
+
+        for (int i = 0; i < tickCount; i++)
+        {
+            yield return new WaitForSeconds(tickInterval);
+
+            // Appliquer les degats electriques
+            if (TryGetComponent<IDamageable>(out var damageable))
+            {
+                var damageInfo = new DamageInfo
+                {
+                    baseDamage = damagePerTick,
+                    damageType = DamageType.Electric,
+                    attacker = gameObject,
+                    hitPoint = transform.position
+                };
+                damageable.TakeDamage(damageInfo);
+            }
+
+            // Propager aux entites proches dans l'eau (comportement ElectroCharged)
+            PropagateElectroChargedToNearbyWetTargets(damagePerTick * 0.3f);
+        }
+
+        // Consommer les elements apres la reaction
+        _status.ClearElement();
+    }
+
+    private void PropagateElectroChargedToNearbyWetTargets(float damage)
+    {
+        float propagationRadius = 3f;
+        Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, propagationRadius, _affectedLayers);
+
+        foreach (var collider in nearbyColliders)
+        {
+            if (collider.gameObject == gameObject) continue;
+
+            // Verifier si la cible a de l'eau appliquee
+            if (collider.TryGetComponent<ElementalStatus>(out var targetStatus))
+            {
+                if (targetStatus.CurrentElement == ElementType.Water)
+                {
+                    // Appliquer des degats reduits
+                    if (collider.TryGetComponent<IDamageable>(out var damageable))
+                    {
+                        var damageInfo = new DamageInfo
+                        {
+                            baseDamage = damage,
+                            damageType = DamageType.Electric,
+                            attacker = gameObject,
+                            hitPoint = collider.transform.position
+                        };
+                        damageable.TakeDamage(damageInfo);
+                    }
+                }
+            }
+        }
     }
 
     private void UpdateFreezeStatus()

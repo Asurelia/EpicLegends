@@ -31,6 +31,11 @@ public class QuestManager : MonoBehaviour
         Instance = this;
     }
 
+    private void Update()
+    {
+        CheckQuestTimeouts();
+    }
+
     private void SafeDestroy(UnityEngine.Object obj)
     {
         if (obj == null) return;
@@ -453,6 +458,11 @@ public class QuestManager : MonoBehaviour
 
     private void GiveQuestRewards(QuestData quest, QuestProgress progress)
     {
+        // Obtenir les references du joueur
+        var player = GameManager.Instance?.Player;
+        var playerStats = player?.GetComponent<PlayerStats>();
+        var inventory = player?.GetComponent<Inventory>();
+
         // XP
         if (quest.xpReward > 0)
         {
@@ -466,13 +476,21 @@ public class QuestManager : MonoBehaviour
         // Or
         if (quest.goldReward > 0)
         {
-            // TODO: Integration avec un systeme de monnaie
-            // Le systeme de ressources ne gere pas la monnaie directement
-            Debug.Log($"[Quest] Reward: {quest.goldReward} gold");
+            if (playerStats != null)
+            {
+                playerStats.AddGold(quest.goldReward);
+                Debug.Log($"[Quest] Reward: {quest.goldReward} gold");
+            }
+            else if (inventory != null)
+            {
+                // Alternative: utiliser l'inventaire pour l'or
+                inventory.AddGold(quest.goldReward);
+                Debug.Log($"[Quest] Reward: {quest.goldReward} gold (via Inventory)");
+            }
         }
 
         // Items
-        if (quest.itemRewards != null)
+        if (quest.itemRewards != null && inventory != null)
         {
             foreach (var reward in quest.itemRewards)
             {
@@ -481,12 +499,59 @@ public class QuestManager : MonoBehaviour
                     float roll = UnityEngine.Random.value;
                     if (roll <= reward.dropChance)
                     {
-                        // Ajouter a l'inventaire
-                        // TODO: Integration avec Inventory system
+                        int remaining = inventory.TryAddItem(reward.item, reward.amount);
+                        if (remaining > 0)
+                        {
+                            Debug.LogWarning($"[Quest] Inventaire plein, {remaining}x {reward.item.displayName} perdu");
+                        }
+                        else
+                        {
+                            Debug.Log($"[Quest] Reward: {reward.amount}x {reward.item.displayName}");
+                        }
                     }
                 }
             }
         }
+
+        // Bonus rewards si objectifs optionnels completes
+        if (quest.optionalObjectives != null && quest.bonusRewards != null && inventory != null)
+        {
+            int optionalCompleted = CountCompletedOptionalObjectives(quest, progress);
+            if (optionalCompleted > 0)
+            {
+                foreach (var bonus in quest.bonusRewards)
+                {
+                    if (bonus.item != null)
+                    {
+                        float roll = UnityEngine.Random.value;
+                        if (roll <= bonus.dropChance)
+                        {
+                            inventory.TryAddItem(bonus.item, bonus.amount);
+                            Debug.Log($"[Quest] Bonus Reward: {bonus.amount}x {bonus.item.displayName}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private int CountCompletedOptionalObjectives(QuestData quest, QuestProgress progress)
+    {
+        if (quest.optionalObjectives == null) return 0;
+        // Les objectifs optionnels utilisent les indices apres les objectifs normaux
+        int mainCount = quest.objectives?.Length ?? 0;
+        int completed = 0;
+
+        for (int i = 0; i < quest.optionalObjectives.Length; i++)
+        {
+            int optionalIndex = mainCount + i;
+            if (progress.GetObjectiveProgress(optionalIndex) >= quest.optionalObjectives[i].requiredAmount)
+            {
+                completed++;
+            }
+        }
+
+        return completed;
     }
 
     private void UnlockFollowUpQuests(QuestData quest)
@@ -499,8 +564,183 @@ public class QuestManager : MonoBehaviour
             {
                 // Les quetes sont maintenant disponibles
                 // Le joueur peut les accepter
+                Debug.Log($"[Quest] Quete debloquee: {nextQuest.questName}");
             }
         }
+    }
+
+    private void CheckQuestTimeouts()
+    {
+        if (_activeQuests == null || _activeQuests.Count == 0) return;
+
+        // Liste des quetes a echouer
+        var questsToFail = new List<string>();
+
+        foreach (var kvp in _activeQuests)
+        {
+            var progress = kvp.Value;
+            var quest = progress.QuestData;
+
+            // Verifier la limite de temps
+            if (quest.timeLimit > 0 && !progress.IsFailed)
+            {
+                if (progress.ElapsedTime >= quest.timeLimit)
+                {
+                    questsToFail.Add(kvp.Key);
+                }
+            }
+        }
+
+        // Echouer les quetes hors temps
+        foreach (var questId in questsToFail)
+        {
+            FailQuest(questId);
+        }
+    }
+
+    /// <summary>
+    /// Fait echouer une quete.
+    /// </summary>
+    /// <param name="questId">ID de la quete.</param>
+    public void FailQuest(string questId)
+    {
+        if (string.IsNullOrEmpty(questId)) return;
+        if (_activeQuests == null) return;
+
+        if (!_activeQuests.TryGetValue(questId, out var progress)) return;
+
+        var quest = progress.QuestData;
+        progress.MarkFailed();
+
+        // Retirer de la liste active
+        _activeQuests.Remove(questId);
+        _trackedQuests?.Remove(questId);
+
+        OnQuestFailed?.Invoke(quest);
+
+        Debug.Log($"[Quest] Quete echouee: {quest.questName}");
+    }
+
+    #endregion
+
+    #region Save/Load
+
+    /// <summary>
+    /// Obtient les donnees de sauvegarde des quetes.
+    /// Utilise les classes de SaveData.cs.
+    /// </summary>
+    public QuestSaveData GetSaveData()
+    {
+        var saveData = new QuestSaveData();
+
+        // Sauvegarder les quetes actives
+        if (_activeQuests != null)
+        {
+            foreach (var kvp in _activeQuests)
+            {
+                var progress = kvp.Value;
+                var questSave = new ActiveQuestData
+                {
+                    questId = kvp.Key,
+                    startTimestamp = (long)(progress.StartTime * 1000), // Convertir en ms
+                    objectiveProgress = new List<ObjectiveProgress>()
+                };
+
+                // Sauvegarder la progression de chaque objectif
+                if (progress.QuestData?.objectives != null)
+                {
+                    for (int i = 0; i < progress.QuestData.objectives.Length; i++)
+                    {
+                        questSave.objectiveProgress.Add(new ObjectiveProgress
+                        {
+                            objectiveIndex = i,
+                            currentProgress = progress.GetObjectiveProgress(i),
+                            isCompleted = progress.IsObjectiveComplete(i)
+                        });
+                    }
+                }
+
+                saveData.activeQuests.Add(questSave);
+            }
+        }
+
+        // Sauvegarder les quetes completees
+        if (_completedQuests != null)
+        {
+            saveData.completedQuestIds.AddRange(_completedQuests);
+        }
+
+        return saveData;
+    }
+
+    /// <summary>
+    /// Charge les donnees de sauvegarde des quetes.
+    /// </summary>
+    public void LoadSaveData(QuestSaveData saveData, QuestData[] allQuests)
+    {
+        if (saveData == null || allQuests == null) return;
+
+        // Reset
+        _activeQuests?.Clear();
+        _completedQuests?.Clear();
+        _trackedQuests?.Clear();
+
+        if (_activeQuests == null) _activeQuests = new Dictionary<string, QuestProgress>();
+        if (_completedQuests == null) _completedQuests = new HashSet<string>();
+        if (_trackedQuests == null) _trackedQuests = new List<string>();
+
+        // Charger les quetes completees
+        if (saveData.completedQuestIds != null)
+        {
+            foreach (var questId in saveData.completedQuestIds)
+            {
+                _completedQuests.Add(questId);
+            }
+        }
+
+        // Charger les quetes echouees
+        if (saveData.failedQuestIds != null)
+        {
+            foreach (var questId in saveData.failedQuestIds)
+            {
+                // Les quetes echouees sont simplement non-actives
+                // Elles pourraient etre re-acceptees si repetables
+            }
+        }
+
+        // Charger les quetes actives
+        if (saveData.activeQuests != null)
+        {
+            foreach (var questSave in saveData.activeQuests)
+            {
+                var questData = System.Array.Find(allQuests, q => q.questId == questSave.questId);
+                if (questData == null) continue;
+
+                var progress = new QuestProgress(questData);
+
+                // Restaurer la progression des objectifs
+                if (questSave.objectiveProgress != null)
+                {
+                    foreach (var objProgress in questSave.objectiveProgress)
+                    {
+                        if (objProgress.currentProgress > 0)
+                        {
+                            progress.UpdateObjective(objProgress.objectiveIndex, objProgress.currentProgress);
+                        }
+                    }
+                }
+
+                _activeQuests[questSave.questId] = progress;
+
+                // Auto-track si moins de 3 quetes suivies
+                if (_trackedQuests.Count < _maxTrackedQuests)
+                {
+                    _trackedQuests.Add(questSave.questId);
+                }
+            }
+        }
+
+        Debug.Log($"[Quest] Charge: {_activeQuests.Count} actives, {_completedQuests.Count} completees");
     }
 
     #endregion

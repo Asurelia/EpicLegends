@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
@@ -238,7 +239,7 @@ public class UITooltip : MonoBehaviour
     {
         if (_tooltipRect == null || _parentCanvas == null) return;
 
-        Vector2 mousePos = Input.mousePosition;
+        Vector2 mousePos = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
         Vector2 tooltipPos = mousePos + _offset;
 
         // S'assurer que le tooltip reste dans l'ecran

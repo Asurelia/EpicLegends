@@ -150,10 +150,10 @@ public class WeaponController : MonoBehaviour
             );
         }
 
-        // Configurer la hitbox
+        // Configurer la hitbox selon l'arme
         if (_hitbox != null)
         {
-            // TODO: Configurer la taille de la hitbox selon l'arme
+            ConfigureHitboxForWeapon(weaponData);
         }
 
         OnWeaponEquipped?.Invoke(weaponData);
@@ -328,6 +328,66 @@ public class WeaponController : MonoBehaviour
         damageInfo.baseDamage *= damageMultiplier;
 
         _hitbox.Activate(damageInfo);
+    }
+
+    private void ConfigureHitboxForWeapon(WeaponData weaponData)
+    {
+        if (weaponData == null || _hitbox == null) return;
+
+        // Creer ou modifier les donnees de hitbox selon le type d'arme
+        var hitboxData = ScriptableObject.CreateInstance<HitboxData>();
+
+        // Configurer la taille selon le type d'arme et sa portee
+        switch (weaponData.weaponType)
+        {
+            case WeaponType.Sword:
+                hitboxData.shape = HitboxShape.Box;
+                hitboxData.size = new Vector3(1f, 0.5f, weaponData.range);
+                hitboxData.offset = new Vector3(0f, 0.5f, weaponData.range * 0.5f);
+                break;
+
+            case WeaponType.Greatsword:
+                hitboxData.shape = HitboxShape.Box;
+                hitboxData.size = new Vector3(1.5f, 1f, weaponData.range);
+                hitboxData.offset = new Vector3(0f, 0.75f, weaponData.range * 0.5f);
+                hitboxData.maxTargets = 8; // Plus de cibles pour armes lourdes
+                break;
+
+            case WeaponType.DualBlades:
+                hitboxData.shape = HitboxShape.Sphere;
+                hitboxData.radius = weaponData.range * 0.6f;
+                hitboxData.offset = new Vector3(0f, 0.5f, weaponData.range * 0.4f);
+                hitboxData.canRehit = true; // Multi-hit pour lames doubles
+                hitboxData.rehitDelay = 0.2f;
+                break;
+
+            case WeaponType.Spear:
+                hitboxData.shape = HitboxShape.Box;
+                hitboxData.size = new Vector3(0.4f, 0.4f, weaponData.range);
+                hitboxData.offset = new Vector3(0f, 0.5f, weaponData.range * 0.5f);
+                hitboxData.maxTargets = 3; // Moins de cibles, mais plus de portee
+                break;
+
+            case WeaponType.Scythe:
+                hitboxData.shape = HitboxShape.Sphere;
+                hitboxData.radius = weaponData.range * 0.8f;
+                hitboxData.offset = new Vector3(0f, 0.5f, weaponData.range * 0.3f);
+                hitboxData.maxTargets = 6;
+                break;
+
+            default:
+                hitboxData.shape = HitboxShape.Box;
+                hitboxData.size = new Vector3(1f, 0.5f, weaponData.range);
+                hitboxData.offset = new Vector3(0f, 0.5f, weaponData.range * 0.5f);
+                break;
+        }
+
+        // Configurer les multiplicateurs selon les stats de l'arme
+        hitboxData.damageMultiplier = 1f;
+        hitboxData.knockbackMultiplier = weaponData.knockbackForce / 3f; // Normalise par rapport a la valeur par defaut
+        hitboxData.staggerMultiplier = weaponData.staggerValue / 10f; // Normalise
+
+        _hitbox.Data = hitboxData;
     }
 
     #endregion

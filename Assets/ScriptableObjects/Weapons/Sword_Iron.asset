@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9411e875bf55b64f8651d8ad4ba1b1e, type: 3}
+  m_Name: Sword_Iron
+  m_EditorClassIdentifier: EpicLegends::WeaponData
+  weaponName: Epee de Fer
+  description: Une epee simple mais fiable pour les debutants.
+  weaponType: 0
+  icon: {fileID: 0}
+  prefab: {fileID: 0}
+  baseDamage: 15
+  attackSpeed: 1.2
+  range: 2
+  isRanged: 0
+  damageType: 0
+  critChance: 0.05
+  critMultiplier: 1.5
+  staggerValue: 10
+  knockbackForce: 3
+  canBreakGuard: 0
+  canCharge: 0
+  minChargeTime: 0.5
+  maxChargeTime: 2
+  chargeMultiplier: 2
+  lightCombo: {fileID: 0}
+  heavyCombo: {fileID: 0}
+  specialAttack: {fileID: 0}
+  lifesteal: 0
+  bonusElementDamage: 0
+  attackSounds: []
+  chargeCompleteSound: {fileID: 0}
+  trailEffect: {fileID: 0}

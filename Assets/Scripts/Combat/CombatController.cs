@@ -19,11 +19,23 @@ public class CombatController : MonoBehaviour
 
     [Header("Combos")]
     [SerializeField] private List<ComboData> _combos = new List<ComboData>();
+    [SerializeField] private ComboData _lightCombo;
+    [SerializeField] private ComboData _heavyCombo;
+
+    [Header("Charged Attack")]
+    [SerializeField] private AttackData _chargedAttack;
+    [SerializeField] private float _minChargeTime = 0.5f;
+    [SerializeField] private float _maxChargeTime = 2f;
 
     [Header("Timing")]
     [SerializeField] private float _parryWindowDuration = 0.2f;
     [SerializeField] private float _dodgeIFrameDuration = 0.3f;
     [SerializeField] private float _blockStaminaCost = 5f;
+
+    [Header("Dodge")]
+    [SerializeField] private float _dodgeDistance = 4f;
+    [SerializeField] private float _dodgeSpeed = 15f;
+    [SerializeField] private AnimationCurve _dodgeCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
     #endregion
 
@@ -37,6 +49,14 @@ public class CombatController : MonoBehaviour
     private float _chargeTimer;
     private bool _inputBuffered;
     private bool _heavyInputBuffered;
+
+    // Dodge
+    private Vector3 _dodgeDirection;
+    private float _dodgeTimer;
+    private float _dodgeDuration;
+    private Vector3 _dodgeStartPosition;
+    private CharacterController _characterController;
+    private Rigidbody _rigidbody;
 
     #endregion
 
@@ -104,6 +124,11 @@ public class CombatController : MonoBehaviour
         if (_knockbackReceiver == null)
             _knockbackReceiver = GetComponent<KnockbackReceiver>();
 
+        // Composants de mouvement pour dodge
+        _characterController = GetComponent<CharacterController>();
+        _rigidbody = GetComponent<Rigidbody>();
+        _dodgeDuration = _dodgeDistance / _dodgeSpeed;
+
         // Configurer les events
         if (_hurtbox != null)
         {
@@ -125,6 +150,7 @@ public class CombatController : MonoBehaviour
     {
         UpdateTimers();
         UpdateState();
+        UpdateDodgeMovement();
     }
 
     private void OnDestroy()
@@ -232,8 +258,50 @@ public class CombatController : MonoBehaviour
     {
         if (_currentState != CombatState.Charging) return;
 
-        // TODO: Implementer l'attaque chargee
-        SetState(CombatState.Idle);
+        // Calculer le pourcentage de charge
+        float chargePercent = 0f;
+        if (_chargeTimer >= _minChargeTime)
+        {
+            chargePercent = Mathf.Clamp01(
+                (_chargeTimer - _minChargeTime) / (_maxChargeTime - _minChargeTime)
+            );
+        }
+
+        // Determiner l'attaque a utiliser
+        AttackData attackToUse = _chargedAttack;
+        if (attackToUse == null && _heavyCombo != null && _heavyCombo.Length > 0)
+        {
+            attackToUse = _heavyCombo.GetAttack(0);
+        }
+
+        if (attackToUse != null && _chargeTimer >= _minChargeTime)
+        {
+            // Executer l'attaque chargee
+            SetState(CombatState.Attacking);
+            _attackTimer = attackToUse.animationDuration;
+
+            if (_hitbox != null)
+            {
+                var damageInfo = attackToUse.CreateDamageInfo(gameObject, chargePercent);
+                damageInfo.comboIndex = 0;
+                _hitbox.Activate(damageInfo);
+            }
+
+            if (_animator != null && !string.IsNullOrEmpty(attackToUse.animationTrigger))
+            {
+                _animator.SetTrigger(attackToUse.animationTrigger);
+                _animator.SetFloat("ChargePercent", chargePercent);
+            }
+
+            OnAttackStarted?.Invoke(attackToUse);
+        }
+        else
+        {
+            // Charge insuffisante - annuler
+            SetState(CombatState.Idle);
+        }
+
+        _chargeTimer = 0f;
     }
 
     /// <summary>
@@ -294,6 +362,16 @@ public class CombatController : MonoBehaviour
             _hurtbox.SetState(HurtboxState.Invincible);
         }
 
+        // Initialiser le mouvement de dodge
+        _dodgeDirection = direction.normalized;
+        if (_dodgeDirection.sqrMagnitude < 0.01f)
+        {
+            // Si pas de direction, dodge en arriere
+            _dodgeDirection = -transform.forward;
+        }
+        _dodgeTimer = 0f;
+        _dodgeStartPosition = transform.position;
+
         // Les i-frames durent un temps limite
         Invoke(nameof(EndDodge), _dodgeIFrameDuration);
     }
@@ -346,6 +424,12 @@ public class CombatController : MonoBehaviour
 
         if (_currentCombo == null || _comboIndex >= _currentCombo.Length)
         {
+            // Verifier si on peut declencher le finisher
+            if (_currentCombo != null && _currentCombo.CanTriggerFinisher(_comboIndex))
+            {
+                ExecuteFinisher();
+                return;
+            }
             EndCombo();
             return;
         }
@@ -358,6 +442,38 @@ public class CombatController : MonoBehaviour
         }
 
         ExecuteAttack(attack);
+    }
+
+    private void ExecuteFinisher()
+    {
+        if (_currentCombo == null || _currentCombo.finisherAttack == null) return;
+
+        var finisher = _currentCombo.finisherAttack;
+        SetState(CombatState.Attacking);
+        _attackTimer = finisher.animationDuration;
+        _comboWindowTimer = 0f;
+
+        // Activer la hitbox avec bonus de degats pour finisher
+        if (_hitbox != null)
+        {
+            var damageInfo = finisher.CreateDamageInfo(gameObject);
+            damageInfo.baseDamage *= 1.5f; // Bonus finisher
+            damageInfo.comboIndex = _comboIndex;
+            _hitbox.Activate(damageInfo);
+        }
+
+        // Jouer l'animation
+        if (_animator != null && !string.IsNullOrEmpty(finisher.animationTrigger))
+        {
+            _animator.SetTrigger(finisher.animationTrigger);
+            _animator.SetBool("IsFinisher", true);
+        }
+
+        OnAttackStarted?.Invoke(finisher);
+
+        // Fin du combo apres le finisher
+        _currentCombo = null;
+        _comboIndex = 0;
     }
 
     private void ExecuteAttack(AttackData attack)
@@ -387,8 +503,32 @@ public class CombatController : MonoBehaviour
 
     private ComboData GetComboForInput(bool isHeavy)
     {
-        // Pour l'instant, retourne le premier combo disponible
-        // TODO: Ajouter la logique de selection de combo
+        // Priorite: combo specifique light/heavy, puis liste generale
+        if (isHeavy)
+        {
+            if (_heavyCombo != null) return _heavyCombo;
+        }
+        else
+        {
+            if (_lightCombo != null) return _lightCombo;
+        }
+
+        // Fallback: chercher dans la liste generale
+        foreach (var combo in _combos)
+        {
+            if (combo == null) continue;
+
+            // Verifier si le combo correspond au type d'input
+            var firstAttack = combo.GetAttack(0);
+            if (firstAttack != null)
+            {
+                // Les attaques lourdes ont generalement plus de degats de base
+                bool isHeavyCombo = firstAttack.baseDamage > 15f || firstAttack.isGuardBreak;
+                if (isHeavy == isHeavyCombo) return combo;
+            }
+        }
+
+        // Dernier fallback: premier combo disponible
         return _combos.Count > 0 ? _combos[0] : null;
     }
 
@@ -434,6 +574,33 @@ public class CombatController : MonoBehaviour
             {
                 _hurtbox.SetState(HurtboxState.Vulnerable);
             }
+        }
+    }
+
+    private void UpdateDodgeMovement()
+    {
+        if (_currentState != CombatState.Dodging) return;
+
+        _dodgeTimer += Time.deltaTime;
+        float t = Mathf.Clamp01(_dodgeTimer / _dodgeDuration);
+        float curveValue = _dodgeCurve.Evaluate(t);
+
+        // Calculer la position cible
+        Vector3 targetPosition = _dodgeStartPosition + _dodgeDirection * _dodgeDistance * curveValue;
+
+        // Appliquer le mouvement selon le composant disponible
+        if (_characterController != null && _characterController.enabled)
+        {
+            Vector3 move = targetPosition - transform.position;
+            _characterController.Move(move);
+        }
+        else if (_rigidbody != null)
+        {
+            _rigidbody.MovePosition(targetPosition);
+        }
+        else
+        {
+            transform.position = targetPosition;
         }
     }
 

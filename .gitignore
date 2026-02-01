@@ -100,3 +100,7 @@ InitTestScene*.unity*
 
 # Claude Code local files
 .claude/CLAUDE.local.md
+
+# Raw resource files (source assets, not imported)
+/resource/
+nul
