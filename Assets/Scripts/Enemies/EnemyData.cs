@@ -19,6 +19,9 @@ public class EnemyData : ScriptableObject
     [Tooltip("Type d'ennemi")]
     public EnemyType enemyType = EnemyType.Basic;
 
+    [Tooltip("Est un boss?")]
+    public bool isBoss = false;
+
     [Tooltip("Comportement de base")]
     public AIBehavior baseBehavior = AIBehavior.Aggressive;
 

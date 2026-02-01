@@ -426,17 +426,66 @@ public class WaveManager : MonoBehaviour
         var waveData = CurrentWaveData;
         if (waveData == null) return;
 
-        // Appliquer le scaling de difficulte global
+        // Appliquer le scaling de difficulte global + multiplicateurs de vague
         float difficultyScale = 1f + (_difficultyScaling * _currentWaveIndex);
 
-        // Modifier la sante
-        var health = enemy.GetComponent<Health>();
-        if (health != null)
-        {
-            // On utiliserait une methode pour modifier la sante max
-        }
+        float healthMult = waveData.healthMultiplier * difficultyScale;
+        float damageMult = waveData.damageMultiplier * difficultyScale;
+        float speedMult = waveData.speedMultiplier;
 
-        // Modifier d'autres stats selon les multiplicateurs
+        // Appliquer les modificateurs d'evenements speciaux
+        ApplySpecialEventModifiers(waveData, ref healthMult, ref damageMult, ref speedMult);
+
+        // Appliquer via EnemyAI si disponible
+        var enemyAI = enemy.GetComponent<EnemyAI>();
+        if (enemyAI != null)
+        {
+            enemyAI.ApplyWaveModifiers(healthMult, damageMult, speedMult);
+        }
+        else
+        {
+            // Fallback: modifier Health directement
+            var health = enemy.GetComponent<Health>();
+            if (health != null)
+            {
+                float newMaxHealth = health.MaxHealth * healthMult;
+                health.SetMaxHealth(newMaxHealth);
+                health.ResetHealth();
+            }
+        }
+    }
+
+    private void ApplySpecialEventModifiers(WaveData waveData, ref float healthMult, ref float damageMult, ref float speedMult)
+    {
+        if (!waveData.hasSpecialEvent) return;
+
+        switch (waveData.specialEvent)
+        {
+            case SpecialEventType.FastEnemies:
+                speedMult *= 1.5f;
+                break;
+
+            case SpecialEventType.ArmoredEnemies:
+                healthMult *= 2f;
+                break;
+
+            case SpecialEventType.HealingEnemies:
+                healthMult *= 1.25f;
+                break;
+
+            case SpecialEventType.ExplosiveEnemies:
+                damageMult *= 1.5f;
+                healthMult *= 0.75f;
+                break;
+
+            case SpecialEventType.DoubleRewards:
+                // Gere dans GiveRewards
+                break;
+
+            case SpecialEventType.InvisibleEnemies:
+                // Gere par le rendu de l'ennemi
+                break;
+        }
     }
 
     private void CompleteWave(bool bonusEarned)
@@ -474,9 +523,19 @@ public class WaveManager : MonoBehaviour
         if (rewards == null) return;
         if (ResourceManager.Instance == null) return;
 
+        var waveData = CurrentWaveData;
+        float rewardMult = waveData != null ? waveData.rewardMultiplier : 1f;
+
+        // Appliquer le bonus de double recompenses
+        if (waveData != null && waveData.hasSpecialEvent && waveData.specialEvent == SpecialEventType.DoubleRewards)
+        {
+            rewardMult *= 2f;
+        }
+
         foreach (var reward in rewards)
         {
-            ResourceManager.Instance.AddResource(reward.resourceType, reward.amount);
+            int amount = Mathf.RoundToInt(reward.amount * rewardMult);
+            ResourceManager.Instance.AddResource(reward.resourceType, amount);
         }
     }
 

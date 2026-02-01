@@ -192,4 +192,61 @@ public class CraftingManagerTests
 
         Object.DestroyImmediate(recipe);
     }
+
+    [Test]
+    public void CraftingManager_CanCraft_NoArg_ReturnsFalse_WhenNoResourceManager()
+    {
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+        recipe.recipeName = "TestRecipe";
+        recipe.unlockedByDefault = true;
+
+        bool canCraft = _manager.CanCraft(recipe);
+
+        Assert.IsFalse(canCraft);
+
+        Object.DestroyImmediate(recipe);
+    }
+
+    [Test]
+    public void CraftingManager_GetMissingIngredients_ReturnsEmptyArray_ForNullRecipe()
+    {
+        var missing = _manager.GetMissingIngredients(null);
+
+        Assert.IsNotNull(missing);
+        Assert.AreEqual(0, missing.Length);
+    }
+
+    [Test]
+    public void CraftingManager_GetMissingIngredients_ReturnsAllIngredients_WhenNoResourceManager()
+    {
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+        recipe.recipeName = "TestRecipe";
+        recipe.ingredients = new ResourceCost[]
+        {
+            new ResourceCost { resourceType = ResourceType.Wood, amount = 10 }
+        };
+
+        var missing = _manager.GetMissingIngredients(recipe);
+
+        Assert.IsNotNull(missing);
+        Assert.AreEqual(1, missing.Length);
+        Assert.AreEqual(ResourceType.Wood, missing[0].resourceType);
+        Assert.AreEqual(10, missing[0].amount);
+
+        Object.DestroyImmediate(recipe);
+    }
+
+    [Test]
+    public void CraftingManager_StartCrafting_NoArg_ReturnsFalse_WhenNoResourceManager()
+    {
+        var recipe = ScriptableObject.CreateInstance<CraftingRecipeData>();
+        recipe.recipeName = "TestRecipe";
+        recipe.unlockedByDefault = true;
+
+        bool result = _manager.StartCrafting(recipe);
+
+        Assert.IsFalse(result);
+
+        Object.DestroyImmediate(recipe);
+    }
 }

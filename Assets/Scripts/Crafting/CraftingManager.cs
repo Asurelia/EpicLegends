@@ -118,6 +118,12 @@ public class CraftingManager : MonoBehaviour
         _unlockedRecipes.Add(recipe.recipeName);
         OnRecipeUnlocked?.Invoke(recipe);
 
+        // Notify achievement system
+        if (AchievementManager.Instance != null)
+        {
+            AchievementManager.Instance.OnRecipeLearned();
+        }
+
         Debug.Log($"[CraftingManager] Recipe unlocked: {recipe.recipeName}");
     }
 
@@ -190,6 +196,51 @@ public class CraftingManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Verifie si une recette peut etre craftee avec le ResourceManager global.
+    /// </summary>
+    public bool CanCraft(CraftingRecipeData recipe)
+    {
+        if (recipe == null) return false;
+        if (!IsRecipeUnlocked(recipe)) return false;
+
+        if (ResourceManager.Instance == null)
+        {
+            Debug.LogWarning("[CraftingManager] ResourceManager not found");
+            return false;
+        }
+
+        return recipe.HasIngredients(ResourceManager.Instance);
+    }
+
+    /// <summary>
+    /// Obtient les ingredients manquants pour une recette.
+    /// </summary>
+    public ResourceCost[] GetMissingIngredients(CraftingRecipeData recipe)
+    {
+        if (recipe == null || recipe.ingredients == null) return new ResourceCost[0];
+
+        var missing = new List<ResourceCost>();
+        var resources = ResourceManager.Instance;
+
+        if (resources == null) return recipe.ingredients;
+
+        foreach (var ingredient in recipe.ingredients)
+        {
+            int have = resources.GetResourceCount(ingredient.resourceType);
+            if (have < ingredient.amount)
+            {
+                missing.Add(new ResourceCost
+                {
+                    resourceType = ingredient.resourceType,
+                    amount = ingredient.amount - have
+                });
+            }
+        }
+
+        return missing.ToArray();
+    }
+
+    /// <summary>
     /// Demarre le crafting d'une recette.
     /// </summary>
     public bool StartCrafting(CraftingRecipeData recipe, IResourceContainer resources, int quantity = 1)
@@ -225,6 +276,20 @@ public class CraftingManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Demarre le crafting d'une recette avec le ResourceManager global.
+    /// </summary>
+    public bool StartCrafting(CraftingRecipeData recipe, int quantity = 1)
+    {
+        if (ResourceManager.Instance == null)
+        {
+            Debug.LogWarning("[CraftingManager] ResourceManager not found");
+            return false;
+        }
+
+        return StartCrafting(recipe, ResourceManager.Instance, quantity);
     }
 
     /// <summary>
@@ -317,9 +382,16 @@ public class CraftingManager : MonoBehaviour
             }
         }
         // Si c'est une ressource
-        else
+        else if (recipe.outputResourceType != 0)
         {
-            // TODO: Ajouter a un ResourceManager ou similaire
+            if (ResourceManager.Instance != null)
+            {
+                ResourceManager.Instance.AddResource(recipe.outputResourceType, recipe.outputAmount);
+            }
+            else
+            {
+                Debug.LogWarning("[CraftingManager] ResourceManager not found for resource output");
+            }
         }
     }
 

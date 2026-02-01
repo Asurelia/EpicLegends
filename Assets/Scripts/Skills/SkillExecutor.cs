@@ -429,7 +429,8 @@ public class SkillExecutor : MonoBehaviour
 
     private void ApplyDamageToTargets(SkillData skill, Transform caster, PlayerStats casterStats, List<IDamageable> targets, int totalHits = 1)
     {
-        float attackStat = casterStats != null ? casterStats.Strength : 0f;
+        // Choisir la stat appropriee selon le type de degats
+        float attackStat = GetRelevantAttackStat(skill, casterStats);
         float baseDamage = skill.CalculateDamage(attackStat);
 
         // Diviser les degats si multi-hit
@@ -523,6 +524,40 @@ public class SkillExecutor : MonoBehaviour
             return mono.transform.position + Vector3.up;
         }
         return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Obtient la stat d'attaque pertinente selon le type de degats.
+    /// </summary>
+    private float GetRelevantAttackStat(SkillData skill, PlayerStats casterStats)
+    {
+        if (casterStats == null) return 0f;
+
+        // Choisir la stat selon le type de degats
+        switch (skill.damageType)
+        {
+            case DamageType.Physical:
+                // Degats physiques -> Force
+                return casterStats.Strength;
+
+            case DamageType.Fire:
+            case DamageType.Water:
+            case DamageType.Ice:
+            case DamageType.Electric:
+            case DamageType.Wind:
+            case DamageType.Earth:
+            case DamageType.Light:
+            case DamageType.Dark:
+                // Degats elementaires/magiques -> Intelligence
+                return casterStats.Intelligence;
+
+            case DamageType.True:
+                // Degats vrais -> max(Force, Intelligence)
+                return Mathf.Max(casterStats.Strength, casterStats.Intelligence);
+
+            default:
+                return casterStats.Strength;
+        }
     }
 
     #endregion

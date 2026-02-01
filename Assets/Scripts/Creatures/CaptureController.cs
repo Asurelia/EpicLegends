@@ -278,7 +278,21 @@ public class CaptureController : MonoBehaviour
         float weakeningBonus = CaptureCalculator.CalculateWeakeningBonus(target.Instance);
         int bonusXP = Mathf.RoundToInt(target.Data.defeatExperience * weakeningBonus);
 
-        // TODO: donner l'XP bonus au joueur
+        // Donner l'XP bonus au joueur
+        var playerStats = GetComponent<PlayerStats>();
+        if (playerStats != null && bonusXP > 0)
+        {
+            playerStats.AddExperience(bonusXP);
+        }
+
+        // Achievement integration
+        if (AchievementManager.Instance != null)
+        {
+            AchievementManager.Instance.OnCreatureCaptured();
+        }
+
+        // Consommer l'item de capture de l'inventaire
+        ConsumeEquippedItem();
 
         // Detruire la creature sauvage
         Destroy(target.gameObject);
@@ -300,7 +314,40 @@ public class CaptureController : MonoBehaviour
             AudioSource.PlayClipAtPoint(_equippedItem.failSound, target.transform.position);
         }
 
+        // Consommer l'item de capture meme en cas d'echec
+        ConsumeEquippedItem();
+
         Debug.Log($"Capture ratee! {target.Instance.Nickname} s'est echappe.");
+    }
+
+    /// <summary>
+    /// Consomme l'item de capture equipe.
+    /// </summary>
+    private void ConsumeEquippedItem()
+    {
+        if (_equippedItem == null) return;
+
+        var inventory = GetComponent<Inventory>();
+        if (inventory != null)
+        {
+            // Trouver l'item dans l'inventaire par son nom
+            var items = inventory.GetAllItems();
+            foreach (var item in items)
+            {
+                if (item?.Data != null && item.Data.displayName == _equippedItem.itemName)
+                {
+                    inventory.RemoveItem(item.Data, 1);
+
+                    // Si plus d'item, desequiper
+                    int remaining = inventory.GetItemCount(item.Data.itemId);
+                    if (remaining <= 0)
+                    {
+                        _equippedItem = null;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     private void OnDrawGizmosSelected()

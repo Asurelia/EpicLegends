@@ -308,6 +308,15 @@ public class GameSaveManager : MonoBehaviour
         // Quests
         saveData.questData = CollectQuestData();
 
+        // Resource Nodes
+        saveData.resourceNodeData = CollectResourceNodeData();
+
+        // NG+
+        saveData.ngPlusData = CollectNGPlusData();
+
+        // Territory
+        saveData.territoryData = CollectTerritoryData();
+
         return saveData;
     }
 
@@ -468,6 +477,36 @@ public class GameSaveManager : MonoBehaviour
         return data;
     }
 
+    private ResourceNodeSaveData CollectResourceNodeData()
+    {
+        var manager = ResourceNodeManager.Instance;
+        if (manager != null)
+        {
+            return manager.GetSaveData();
+        }
+        return new ResourceNodeSaveData();
+    }
+
+    private NGPlusSaveData CollectNGPlusData()
+    {
+        var manager = NGPlusManager.Instance;
+        if (manager != null)
+        {
+            return manager.GetSaveData();
+        }
+        return new NGPlusSaveData();
+    }
+
+    private TerritorySaveData CollectTerritoryData()
+    {
+        var manager = TerritoryControl.Instance;
+        if (manager != null)
+        {
+            return manager.GetSaveData();
+        }
+        return new TerritorySaveData();
+    }
+
     #endregion
 
     #region Private Methods - Data Application
@@ -507,6 +546,15 @@ public class GameSaveManager : MonoBehaviour
 
             // Quests
             ApplyQuestData(saveData.questData);
+
+            // Resource Nodes
+            ApplyResourceNodeData(saveData.resourceNodeData);
+
+            // NG+
+            ApplyNGPlusData(saveData.ngPlusData);
+
+            // Territory
+            ApplyTerritoryData(saveData.territoryData);
 
             // Crafting
             if (CraftingManager.Instance != null)
@@ -603,6 +651,42 @@ public class GameSaveManager : MonoBehaviour
         else
         {
             Debug.LogWarning("[GameSaveManager] Cannot load quests: _allQuests not configured");
+        }
+    }
+
+    private void ApplyResourceNodeData(ResourceNodeSaveData data)
+    {
+        if (data == null) return;
+
+        var manager = ResourceNodeManager.Instance;
+        if (manager != null)
+        {
+            manager.LoadSaveData(data);
+            Debug.Log($"[GameSaveManager] Loaded resource nodes: {data.nodeStates.Count} states");
+        }
+    }
+
+    private void ApplyNGPlusData(NGPlusSaveData data)
+    {
+        if (data == null) return;
+
+        var manager = NGPlusManager.Instance;
+        if (manager != null)
+        {
+            manager.LoadSaveData(data);
+            Debug.Log($"[GameSaveManager] Loaded NG+ data: Cycle {data.currentCycle}");
+        }
+    }
+
+    private void ApplyTerritoryData(TerritorySaveData data)
+    {
+        if (data == null) return;
+
+        var manager = TerritoryControl.Instance;
+        if (manager != null)
+        {
+            manager.LoadSaveData(data);
+            Debug.Log($"[GameSaveManager] Loaded territory data: {data.territoryStates.Count} territories");
         }
     }
 

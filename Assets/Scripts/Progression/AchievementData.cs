@@ -36,6 +36,16 @@ public enum AchievementTrigger
     RecipesLearned,
     UpgradesPerformed,
 
+    // Gathering
+    ResourcesGathered,
+
+    // Territory
+    TerritoriesCaptured,
+
+    // Creatures
+    CreaturesCaptured,
+    CreaturesTamed,
+
     // Social
     NPCsInteracted,
     TradesCompleted,

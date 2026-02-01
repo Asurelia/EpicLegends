@@ -43,6 +43,7 @@ public class BuildingPlacer : MonoBehaviour
     public event Action<BuildingData> OnBuildingSelected;
     public event Action<Building> OnBuildingPlaced;
     public event Action OnPlacementCancelled;
+    public event Action<string> OnPlacementFailed;
 
     #endregion
 
@@ -174,7 +175,19 @@ public class BuildingPlacer : MonoBehaviour
     {
         if (!IsPlacing || !_canPlace) return false;
 
-        // Verifier les ressources (TODO: integration avec inventaire)
+        // Verifier les ressources via ResourceManager
+        if (!CanAffordBuilding(_selectedBuilding))
+        {
+            OnPlacementFailed?.Invoke("Ressources insuffisantes");
+            return false;
+        }
+
+        // Consommer les ressources
+        if (!ConsumeResources(_selectedBuilding))
+        {
+            OnPlacementFailed?.Invoke("Erreur lors de la consommation des ressources");
+            return false;
+        }
 
         // Placer le batiment
         Building building = PlaceBuilding();
@@ -186,6 +199,63 @@ public class BuildingPlacer : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Verifie si le joueur peut payer le cout du batiment.
+    /// </summary>
+    public bool CanAffordBuilding(BuildingData data)
+    {
+        if (data == null || data.buildCosts == null || data.buildCosts.Length == 0)
+            return true;
+
+        if (ResourceManager.Instance == null)
+        {
+            Debug.LogWarning("[BuildingPlacer] ResourceManager non trouve, placement autorise");
+            return true;
+        }
+
+        return ResourceManager.Instance.HasResources(data.buildCosts);
+    }
+
+    /// <summary>
+    /// Consomme les ressources pour construire.
+    /// </summary>
+    private bool ConsumeResources(BuildingData data)
+    {
+        if (data == null || data.buildCosts == null || data.buildCosts.Length == 0)
+            return true;
+
+        if (ResourceManager.Instance == null)
+            return true;
+
+        return ResourceManager.Instance.RemoveResources(data.buildCosts);
+    }
+
+    /// <summary>
+    /// Obtient le cout manquant pour un batiment.
+    /// </summary>
+    public ResourceCost[] GetMissingResources(BuildingData data)
+    {
+        if (data == null || data.buildCosts == null || ResourceManager.Instance == null)
+            return new ResourceCost[0];
+
+        var missing = new System.Collections.Generic.List<ResourceCost>();
+
+        foreach (var cost in data.buildCosts)
+        {
+            int have = ResourceManager.Instance.GetResourceCount(cost.resourceType);
+            if (have < cost.amount)
+            {
+                missing.Add(new ResourceCost
+                {
+                    resourceType = cost.resourceType,
+                    amount = cost.amount - have
+                });
+            }
+        }
+
+        return missing.ToArray();
     }
 
     /// <summary>
@@ -304,14 +374,26 @@ public class BuildingPlacer : MonoBehaviour
 
     private bool ValidatePlacement()
     {
-        if (_grid == null) return true;
+        // Verifier le placement sur la grille
+        if (_grid != null)
+        {
+            if (!PlacementValidator.CanPlace(
+                _selectedBuilding,
+                _currentGridPosition,
+                _currentRotation,
+                _grid))
+            {
+                return false;
+            }
+        }
 
-        return PlacementValidator.CanPlace(
-            _selectedBuilding,
-            _currentGridPosition,
-            _currentRotation,
-            _grid
-        );
+        // Verifier les ressources disponibles
+        if (!CanAffordBuilding(_selectedBuilding))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void ApplyPreviewMaterial(bool isValid)

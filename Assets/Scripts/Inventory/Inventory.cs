@@ -131,6 +131,16 @@ public class Inventory : MonoBehaviour
             OnInventoryChanged?.Invoke();
         }
 
+        // Notify achievements if items were added
+        int added = quantity - remaining;
+        if (added > 0 && AchievementManager.Instance != null)
+        {
+            for (int i = 0; i < added; i++)
+            {
+                AchievementManager.Instance.OnItemCollected();
+            }
+        }
+
         return remaining;
     }
 
@@ -527,6 +537,12 @@ public class Inventory : MonoBehaviour
         if (amount > 0)
         {
             Gold += amount;
+
+            // Notify achievements
+            if (AchievementManager.Instance != null)
+            {
+                AchievementManager.Instance.OnGoldEarned(amount);
+            }
         }
     }
 

@@ -74,6 +74,21 @@ public class ResourceSource : MonoBehaviour
         _currentResources = _maxResources;
         _originalPosition = transform.position;
         UpdateVisual();
+
+        // S'enregistrer auprès du manager
+        if (ResourceNodeManager.Instance != null)
+        {
+            ResourceNodeManager.Instance.RegisterNode(this);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Se retirer du manager
+        if (ResourceNodeManager.Instance != null)
+        {
+            ResourceNodeManager.Instance.UnregisterNode(this);
+        }
     }
 
     private void Update()

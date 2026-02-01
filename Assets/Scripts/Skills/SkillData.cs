@@ -163,21 +163,34 @@ public class SkillData : ScriptableObject
 
     /// <summary>
     /// Calcule les degats de la competence.
+    /// Formule: (baseDamage + levelBonus) * (1 + damageScaling * attackStat / 100)
+    /// Ex: baseDamage=100, damageScaling=0.5, attackStat=200 -> 100 * (1 + 0.5 * 200/100) = 100 * 2 = 200
     /// </summary>
     public float CalculateDamage(float attackStat)
     {
         float levelBonus = (currentLevel - 1) * damagePerLevel;
-        float scaledDamage = (baseDamage + levelBonus) * (1f + attackStat * damageScaling / 100f);
-        return scaledDamage;
+        float baseTotal = baseDamage + levelBonus;
+
+        // damageScaling agit comme multiplicateur sur l'attackStat
+        // Formule standard: base * (1 + scaling * stat / 100)
+        float scalingMultiplier = 1f + (damageScaling * attackStat / 100f);
+
+        return baseTotal * scalingMultiplier;
     }
 
     /// <summary>
     /// Calcule le soin de la competence.
+    /// Formule: (baseHeal + levelBonus) * (1 + healingStat / 100)
     /// </summary>
     public float CalculateHeal(float healingStat)
     {
-        float levelBonus = (currentLevel - 1) * damagePerLevel; // Utilise le meme scaling
-        return (baseHeal + levelBonus) * (1f + healingStat / 100f);
+        float levelBonus = (currentLevel - 1) * damagePerLevel;
+        float baseTotal = baseHeal + levelBonus;
+
+        // Scaling standard avec la stat de soin
+        float scalingMultiplier = 1f + (healingStat / 100f);
+
+        return baseTotal * scalingMultiplier;
     }
 
     /// <summary>

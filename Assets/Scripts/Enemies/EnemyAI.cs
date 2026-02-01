@@ -916,6 +916,18 @@ public class EnemyAI : MonoBehaviour
         {
             AudioSource.PlayClipAtPoint(_enemyData.deathSound, transform.position);
         }
+
+        // Notify achievement system
+        if (AchievementManager.Instance != null)
+        {
+            AchievementManager.Instance.OnEnemyKilled();
+
+            // Check if boss
+            if (_enemyData != null && _enemyData.isBoss)
+            {
+                AchievementManager.Instance.OnBossDefeated();
+            }
+        }
     }
 
     private void HandleDamageInfo(DamageInfo damageInfo)
@@ -1056,6 +1068,49 @@ public class EnemyAI : MonoBehaviour
         // Spawn position
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireCube(_spawnPosition != Vector3.zero ? _spawnPosition : transform.position, Vector3.one * 0.5f);
+    }
+
+    #endregion
+
+    #region Wave Modifiers
+
+    /// <summary>
+    /// Applique un multiplicateur de vitesse.
+    /// </summary>
+    public void ApplySpeedMultiplier(float multiplier)
+    {
+        _patrolSpeed *= multiplier;
+        _chaseSpeed *= multiplier;
+
+        if (_agent != null)
+        {
+            _agent.speed = _currentState == EnemyAIState.Chase ? _chaseSpeed : _patrolSpeed;
+        }
+    }
+
+    /// <summary>
+    /// Applique un multiplicateur de degats.
+    /// </summary>
+    public void ApplyDamageMultiplier(float multiplier)
+    {
+        _attackDamage *= multiplier;
+    }
+
+    /// <summary>
+    /// Applique tous les multiplicateurs de vague.
+    /// </summary>
+    public void ApplyWaveModifiers(float healthMult, float damageMult, float speedMult)
+    {
+        // Modifier la sante via le composant Health
+        if (_health != null)
+        {
+            float newMaxHealth = _health.MaxHealth * healthMult;
+            _health.SetMaxHealth(newMaxHealth);
+            _health.ResetHealth();
+        }
+
+        ApplyDamageMultiplier(damageMult);
+        ApplySpeedMultiplier(speedMult);
     }
 
     #endregion

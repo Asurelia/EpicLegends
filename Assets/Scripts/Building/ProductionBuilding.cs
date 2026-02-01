@@ -272,20 +272,7 @@ public class ProductionBuilding : MonoBehaviour
         if (_currentRecipe == null) return;
 
         // Produire le resultat
-        if (_outputStorage != null)
-        {
-            if (_currentRecipe.outputItem != null)
-            {
-                // TODO: Ajouter l'item a l'inventaire
-            }
-            else
-            {
-                _outputStorage.AddResource(
-                    _currentRecipe.outputResourceType,
-                    _currentRecipe.outputAmount
-                );
-            }
-        }
+        ProduceOutput(_currentRecipe);
 
         var completedRecipe = _currentRecipe;
 
@@ -299,6 +286,51 @@ public class ProductionBuilding : MonoBehaviour
         if (_craftQueue.Count > 0)
         {
             StartNextCraft();
+        }
+    }
+
+    private void ProduceOutput(CraftingRecipeData recipe)
+    {
+        if (recipe == null) return;
+
+        // Si c'est un item
+        if (recipe.outputItem != null)
+        {
+            // Essayer d'ajouter a l'inventaire du joueur
+            var player = GameManager.Instance?.Player;
+            if (player != null)
+            {
+                var inventory = player.GetComponent<Inventory>();
+                if (inventory != null)
+                {
+                    inventory.AddItem(recipe.outputItem, recipe.outputAmount);
+                    return;
+                }
+            }
+
+            // Si pas de joueur, spawn l'item dans le monde
+            if (recipe.outputItem.worldPrefab != null)
+            {
+                var spawnPos = transform.position + Vector3.up * 1.5f;
+                var item = Instantiate(recipe.outputItem.worldPrefab, spawnPos, Quaternion.identity);
+                Debug.Log($"[ProductionBuilding] Spawned {recipe.outputItem.displayName} at {spawnPos}");
+            }
+        }
+        // Si c'est une ressource
+        else if (_outputStorage != null)
+        {
+            _outputStorage.AddResource(
+                recipe.outputResourceType,
+                recipe.outputAmount
+            );
+        }
+        // Si pas de storage, ajouter au ResourceManager global
+        else if (ResourceManager.Instance != null)
+        {
+            ResourceManager.Instance.AddResource(
+                recipe.outputResourceType,
+                recipe.outputAmount
+            );
         }
     }
 

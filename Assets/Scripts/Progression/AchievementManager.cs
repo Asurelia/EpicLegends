@@ -463,6 +463,10 @@ public class AchievementManager : MonoBehaviour
     public void OnItemCrafted() => IncrementStat(AchievementTrigger.ItemsCrafted);
     public void OnRecipeLearned() => IncrementStat(AchievementTrigger.RecipesLearned);
     public void OnNPCInteracted() => IncrementStat(AchievementTrigger.NPCsInteracted);
+    public void OnResourceGathered(ResourceType type, int amount) => IncrementStat(AchievementTrigger.ResourcesGathered, amount);
+    public void OnTerritoryCaptured() => IncrementStat(AchievementTrigger.TerritoriesCaptured);
+    public void OnCreatureCaptured() => IncrementStat(AchievementTrigger.CreaturesCaptured);
+    public void OnCreatureTamed() => IncrementStat(AchievementTrigger.CreaturesTamed);
 
     #endregion
 }

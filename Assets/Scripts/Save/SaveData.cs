@@ -52,6 +52,26 @@ public class SaveData
     /// </summary>
     public QuestSaveData questData;
 
+    /// <summary>
+    /// Donnees des nodes de ressources.
+    /// </summary>
+    public ResourceNodeSaveData resourceNodeData;
+
+    /// <summary>
+    /// Donnees du systeme NG+.
+    /// </summary>
+    public NGPlusSaveData ngPlusData;
+
+    /// <summary>
+    /// Donnees des territoires.
+    /// </summary>
+    public TerritorySaveData territoryData;
+
+    /// <summary>
+    /// Donnees du donjon procedural actuel.
+    /// </summary>
+    public ProceduralDungeonSaveData dungeonData;
+
     public SaveData()
     {
         timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -62,6 +82,9 @@ public class SaveData
         achievementData = new AchievementSaveData();
         equipmentData = new EquipmentSaveData();
         questData = new QuestSaveData();
+        resourceNodeData = new ResourceNodeSaveData();
+        ngPlusData = new NGPlusSaveData();
+        territoryData = new TerritorySaveData();
     }
 }
 
@@ -315,4 +338,35 @@ public class EquipmentSaveData
     /// IDs des items equipes par slot.
     /// </summary>
     public Dictionary<EquipmentSlot, string> equippedItemIds = new Dictionary<EquipmentSlot, string>();
+}
+
+/// <summary>
+/// Proprietaire d'un territoire.
+/// </summary>
+public enum TerritoryOwner
+{
+    Neutral,
+    Player,
+    Enemy
+}
+
+/// <summary>
+/// Donnees de sauvegarde des territoires.
+/// </summary>
+[Serializable]
+public class TerritorySaveData
+{
+    public List<TerritoryStateData> territoryStates = new List<TerritoryStateData>();
+}
+
+/// <summary>
+/// Etat d'un territoire sauvegarde.
+/// </summary>
+[Serializable]
+public class TerritoryStateData
+{
+    public string territoryId;
+    public TerritoryOwner owner;
+    public float captureProgress;
+    public bool isContested;
 }
