@@ -11,7 +11,8 @@ public class CombatFeedbackHandler : MonoBehaviour
     [Header("References")]
     [SerializeField] private CombatController _combatController;
     [SerializeField] private WeaponController _weaponController;
-    [SerializeField] private CameraController _cameraController;
+    // TODO: Re-enable when CameraController is updated for Cinemachine 3.x
+    // CameraController temporarily disabled - using VisualEffectsManager fallback
 
     [Header("Hit Feedback")]
     [SerializeField] private float _lightHitShakeIntensity = 0.2f;
@@ -68,8 +69,8 @@ public class CombatFeedbackHandler : MonoBehaviour
             _combatController = GetComponent<CombatController>();
         if (_weaponController == null)
             _weaponController = GetComponent<WeaponController>();
-        if (_cameraController == null)
-            _cameraController = FindFirstObjectByType<CameraController>();
+        // TODO: Re-enable when CameraController is updated for Cinemachine 3.x
+        // CameraController disabled - using VisualEffectsManager fallback only
 
         _audioSource = GetComponent<AudioSource>();
         if (_audioSource == null)
@@ -111,6 +112,9 @@ public class CombatFeedbackHandler : MonoBehaviour
             _hurtbox.OnBlockSuccess -= HandleBlockSuccess;
             _hurtbox.OnParrySuccess -= HandleParrySuccess;
         }
+
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
     }
 
     #endregion
@@ -156,11 +160,7 @@ public class CombatFeedbackHandler : MonoBehaviour
         }
 
         // Appliquer le camera shake
-        if (_cameraController != null)
-        {
-            _cameraController.TriggerShake(shakeIntensity, shakeDuration);
-        }
-        else if (VisualEffectsManager.Instance != null)
+        if (VisualEffectsManager.Instance != null)
         {
             VisualEffectsManager.Instance.TriggerScreenShake(shakeIntensity, shakeDuration);
         }
@@ -184,11 +184,7 @@ public class CombatFeedbackHandler : MonoBehaviour
     private void HandleDamageReceived(DamageInfo damageInfo)
     {
         // Shake plus subtil quand on recoit des degats
-        if (_cameraController != null)
-        {
-            _cameraController.TriggerShake(_damageShakeIntensity, _damageShakeDuration);
-        }
-        else if (VisualEffectsManager.Instance != null)
+        if (VisualEffectsManager.Instance != null)
         {
             VisualEffectsManager.Instance.TriggerScreenShake(_damageShakeIntensity, _damageShakeDuration);
         }
@@ -207,10 +203,10 @@ public class CombatFeedbackHandler : MonoBehaviour
 
         PlaySound(_blockSound);
 
-        // Petit shake
-        if (_cameraController != null)
+        // Petit shake via VisualEffectsManager
+        if (VisualEffectsManager.Instance != null)
         {
-            _cameraController.TriggerShake(0.15f, 0.1f);
+            VisualEffectsManager.Instance.TriggerScreenShake(0.15f, 0.1f);
         }
     }
 
@@ -230,10 +226,10 @@ public class CombatFeedbackHandler : MonoBehaviour
             VisualEffectsManager.Instance.TriggerHitStop(0.15f, 0.02f);
         }
 
-        // Shake plus prononce
-        if (_cameraController != null)
+        // Shake plus prononce via VisualEffectsManager
+        if (VisualEffectsManager.Instance != null)
         {
-            _cameraController.TriggerShake(0.4f, 0.15f);
+            VisualEffectsManager.Instance.TriggerScreenShake(0.4f, 0.15f);
         }
     }
 
@@ -260,9 +256,14 @@ public class CombatFeedbackHandler : MonoBehaviour
         // Appliquer la couleur de flash
         for (int i = 0; i < _renderers.Length; i++)
         {
-            if (_renderers[i] != null && _renderers[i].material.HasProperty("_Color"))
+            if (_renderers[i] != null)
             {
-                _renderers[i].material.color = _damageFlashColor;
+                var mat = _renderers[i].material;
+                // URP uses _BaseColor, fallback to _Color for legacy
+                if (mat.HasProperty("_BaseColor"))
+                    mat.SetColor("_BaseColor", _damageFlashColor);
+                else if (mat.HasProperty("_Color"))
+                    mat.SetColor("_Color", _damageFlashColor);
             }
         }
 
@@ -271,9 +272,14 @@ public class CombatFeedbackHandler : MonoBehaviour
         // Restaurer les couleurs originales
         for (int i = 0; i < _renderers.Length; i++)
         {
-            if (_renderers[i] != null && _renderers[i].material.HasProperty("_Color"))
+            if (_renderers[i] != null)
             {
-                _renderers[i].material.color = _originalColors[i];
+                var mat = _renderers[i].material;
+                // URP uses _BaseColor, fallback to _Color for legacy
+                if (mat.HasProperty("_BaseColor"))
+                    mat.SetColor("_BaseColor", _originalColors[i]);
+                else if (mat.HasProperty("_Color"))
+                    mat.SetColor("_Color", _originalColors[i]);
             }
         }
     }

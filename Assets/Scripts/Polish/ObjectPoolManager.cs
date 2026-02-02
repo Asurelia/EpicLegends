@@ -336,6 +336,12 @@ public class ObjectPoolManager : MonoBehaviour
         Debug.LogError($"[Pool] {message}");
     }
 
+    private void OnDestroy()
+    {
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
+    }
+
     #endregion
 }
 

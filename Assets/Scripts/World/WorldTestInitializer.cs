@@ -37,6 +37,12 @@ public class WorldTestInitializer : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
+    }
+
     private IEnumerator InitializeWorld()
     {
         _isGenerating = true;
@@ -162,16 +168,52 @@ public class WorldTestInitializer : MonoBehaviour
 
     private void PositionPlayerOnTerrain()
     {
-        if (_player == null || _terrain == null) return;
+        if (_player == null) return;
 
-        // Position at center of terrain
-        Vector3 terrainCenter = _terrain.transform.position +
-            new Vector3(_terrain.terrainData.size.x / 2f, 0, _terrain.terrainData.size.z / 2f);
+        // Get the generator for world info
+        var generator = FindFirstObjectByType<ProceduralWorldGenerator>();
+        if (generator == null) return;
 
-        float height = _terrain.SampleHeight(terrainCenter) + 2f;
-        _player.position = new Vector3(terrainCenter.x, height, terrainCenter.z);
+        // Find a safe spawn position (above water level)
+        float worldSize = generator.WorldSize;
+        float waterLevel = generator.WaterLevel * generator.TerrainHeight;
 
-        Debug.Log($"[WorldTestInitializer] Player positioned at {_player.position}");
+        // Try to find a position above water near center
+        Vector3 spawnPos = Vector3.zero;
+        bool foundSafeSpot = false;
+
+        // Search in a spiral pattern from center
+        float centerX = worldSize / 2f;
+        float centerZ = worldSize / 2f;
+
+        for (int radius = 0; radius < 10 && !foundSafeSpot; radius++)
+        {
+            for (int angle = 0; angle < 8; angle++)
+            {
+                float rad = angle * Mathf.PI / 4f;
+                float x = centerX + radius * 20f * Mathf.Cos(rad);
+                float z = centerZ + radius * 20f * Mathf.Sin(rad);
+
+                float height = generator.GetTerrainHeight(x, z);
+
+                if (height > waterLevel + 5f)
+                {
+                    spawnPos = new Vector3(x, height + 2f, z);
+                    foundSafeSpot = true;
+                    break;
+                }
+            }
+        }
+
+        // Fallback: spawn at center above water level
+        if (!foundSafeSpot)
+        {
+            float height = Mathf.Max(generator.GetTerrainHeight(centerX, centerZ), waterLevel + 10f);
+            spawnPos = new Vector3(centerX, height + 2f, centerZ);
+        }
+
+        _player.position = spawnPos;
+        Debug.Log($"[WorldTestInitializer] Player positioned at {_player.position} (water level: {waterLevel})");
     }
 
     private void OnGUI()

@@ -113,6 +113,9 @@ public class TerrainStreamingController : MonoBehaviour
 
     private void OnDestroy()
     {
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
+
         // Cleanup all chunks
         if (_loadedChunks != null)
         {

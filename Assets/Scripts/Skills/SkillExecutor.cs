@@ -64,6 +64,12 @@ public class SkillExecutor : MonoBehaviour
         _mainCamera = Camera.main;
     }
 
+    private void OnDestroy()
+    {
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
+    }
+
     #endregion
 
     #region Public Methods

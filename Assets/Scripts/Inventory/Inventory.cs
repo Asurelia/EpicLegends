@@ -345,9 +345,17 @@ public class Inventory : MonoBehaviour
         EnsureInitialized();
         if (data == null) return 0;
 
-        return _items
-            .Where(i => i != null && i.Data == data)
-            .Sum(i => i.Quantity);
+        // MAJOR FIX: Replace LINQ with manual loop to avoid GC allocation
+        int count = 0;
+        for (int i = 0; i < _items.Count; i++)
+        {
+            var item = _items[i];
+            if (item != null && item.Data == data)
+            {
+                count += item.Quantity;
+            }
+        }
+        return count;
     }
 
     /// <summary>
@@ -469,7 +477,13 @@ public class Inventory : MonoBehaviour
         get
         {
             EnsureInitialized();
-            return _items.Count(i => i != null);
+            // MAJOR FIX: Replace LINQ with manual loop to avoid GC allocation
+            int count = 0;
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (_items[i] != null) count++;
+            }
+            return count;
         }
     }
 

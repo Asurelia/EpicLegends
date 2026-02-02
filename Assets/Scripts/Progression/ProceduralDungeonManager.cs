@@ -31,6 +31,12 @@ public class ProceduralDungeonManager : MonoBehaviour
         _corridors = new List<Vector2Int>();
     }
 
+    private void OnDestroy()
+    {
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
+    }
+
     #endregion
 
     #region Events
@@ -792,14 +798,46 @@ public class ProceduralDungeonManager : MonoBehaviour
 
         if (floorMat == null)
         {
-            floorMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            floorMat.color = new Color(0.4f, 0.35f, 0.3f);
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Simple Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+            if (shader == null) shader = Shader.Find("Diffuse");
+
+            if (shader != null)
+            {
+                floorMat = new Material(shader);
+                Color floorColor = new Color(0.4f, 0.35f, 0.3f);
+
+                // Set color using URP property names with fallback
+                if (floorMat.HasProperty("_BaseColor"))
+                    floorMat.SetColor("_BaseColor", floorColor);
+                else if (floorMat.HasProperty("_Color"))
+                    floorMat.SetColor("_Color", floorColor);
+                else
+                    floorMat.color = floorColor;
+            }
         }
 
         if (wallMat == null)
         {
-            wallMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            wallMat.color = new Color(0.3f, 0.25f, 0.2f);
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Simple Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+            if (shader == null) shader = Shader.Find("Diffuse");
+
+            if (shader != null)
+            {
+                wallMat = new Material(shader);
+                Color wallColor = new Color(0.3f, 0.25f, 0.2f);
+
+                // Set color using URP property names with fallback
+                if (wallMat.HasProperty("_BaseColor"))
+                    wallMat.SetColor("_BaseColor", wallColor);
+                else if (wallMat.HasProperty("_Color"))
+                    wallMat.SetColor("_Color", wallColor);
+                else
+                    wallMat.color = wallColor;
+            }
         }
 
         int cellsProcessed = 0;

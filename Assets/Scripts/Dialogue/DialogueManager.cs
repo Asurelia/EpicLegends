@@ -113,6 +113,9 @@ public class DialogueManager : MonoBehaviour
     {
         _advanceAction?.Disable();
         _skipAction?.Disable();
+
+        // MAJOR FIX: Stop all coroutines to prevent memory leaks
+        StopAllCoroutines();
     }
 
     private void SetupInputActions()
