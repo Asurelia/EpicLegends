@@ -27,6 +27,7 @@ public class ObjectPoolManager : MonoBehaviour
         Instance = this;
 
         _pools = new Dictionary<string, ObjectPool>();
+        _pooledObjectCache = new Dictionary<GameObject, IPooledObject>();
         InitializePools();
     }
 
@@ -60,6 +61,9 @@ public class ObjectPoolManager : MonoBehaviour
 
     // Pools actifs
     private Dictionary<string, ObjectPool> _pools;
+
+    // PERF FIX: Cache IPooledObject components to avoid GetComponent calls in Spawn/Return
+    private Dictionary<GameObject, IPooledObject> _pooledObjectCache;
 
     #endregion
 
@@ -158,8 +162,8 @@ public class ObjectPoolManager : MonoBehaviour
 
         pool.active.Add(obj);
 
-        // Notifier le composant
-        var pooled = obj.GetComponent<IPooledObject>();
+        // Notifier le composant (utilise le cache pour eviter GetComponent)
+        var pooled = GetCachedPooledObject(obj);
         pooled?.OnSpawn();
 
         OnObjectSpawned?.Invoke(poolName, obj);
@@ -181,8 +185,8 @@ public class ObjectPoolManager : MonoBehaviour
             return;
         }
 
-        // Notifier le composant
-        var pooled = obj.GetComponent<IPooledObject>();
+        // Notifier le composant (utilise le cache pour eviter GetComponent)
+        var pooled = GetCachedPooledObject(obj);
         pooled?.OnDespawn();
 
         obj.SetActive(false);
@@ -238,6 +242,8 @@ public class ObjectPoolManager : MonoBehaviour
         while (pool.available.Count > keepCount)
         {
             var obj = pool.available.Dequeue();
+            // PERF FIX: Remove from cache before destroying
+            _pooledObjectCache?.Remove(obj);
             SafeDestroy(obj);
         }
 
@@ -309,7 +315,37 @@ public class ObjectPoolManager : MonoBehaviour
         var obj = Instantiate(config.prefab, _poolContainer);
         obj.name = $"{config.poolName}_{obj.GetInstanceID()}";
         obj.SetActive(false);
+
+        // PERF FIX: Pre-cache IPooledObject component at creation time
+        var pooledComponent = obj.GetComponent<IPooledObject>();
+        if (pooledComponent != null)
+        {
+            _pooledObjectCache[obj] = pooledComponent;
+        }
+
         return obj;
+    }
+
+    /// <summary>
+    /// Recupere le composant IPooledObject depuis le cache.
+    /// </summary>
+    private IPooledObject GetCachedPooledObject(GameObject obj)
+    {
+        if (obj == null) return null;
+
+        // Try cache first
+        if (_pooledObjectCache.TryGetValue(obj, out var cached))
+        {
+            return cached;
+        }
+
+        // Fallback: GetComponent and cache for future use
+        var pooled = obj.GetComponent<IPooledObject>();
+        if (pooled != null)
+        {
+            _pooledObjectCache[obj] = pooled;
+        }
+        return pooled;
     }
 
     private System.Collections.IEnumerator ReturnDelayedCoroutine(string poolName, GameObject obj, float delay)
