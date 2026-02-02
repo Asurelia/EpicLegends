@@ -33,6 +33,9 @@ public class EnemySpawner : MonoBehaviour
     private bool _isSpawning;
     private int _nextSpawnPointIndex;
 
+    // CRITICAL FIX: Store death handlers for proper unsubscription
+    private Dictionary<GameObject, Action> _deathHandlers = new Dictionary<GameObject, Action>();
+
     #endregion
 
     #region Events
@@ -144,10 +147,12 @@ public class EnemySpawner : MonoBehaviour
         GameObject enemy = Instantiate(enemyData.prefab, spawnPosition, spawnRotation);
         _activeEnemies.Add(enemy);
 
-        // S'abonner a l'event de mort
+        // CRITICAL FIX: Store handler reference for proper unsubscription
         if (enemy.TryGetComponent<Health>(out var health))
         {
-            health.OnDeath += () => HandleEnemyDeath(enemy);
+            Action deathHandler = () => HandleEnemyDeath(enemy);
+            _deathHandlers[enemy] = deathHandler;
+            health.OnDeath += deathHandler;
         }
 
         OnEnemySpawned?.Invoke(enemy);
@@ -210,6 +215,12 @@ public class EnemySpawner : MonoBehaviour
 
     private void HandleEnemyDeath(GameObject enemy)
     {
+        // CRITICAL FIX: Clean up the handler reference
+        if (_deathHandlers.ContainsKey(enemy))
+        {
+            _deathHandlers.Remove(enemy);
+        }
+
         _activeEnemies.Remove(enemy);
         OnEnemyDied?.Invoke(enemy);
 
@@ -222,6 +233,19 @@ public class EnemySpawner : MonoBehaviour
     private void CleanupDeadEnemies()
     {
         _activeEnemies.RemoveAll(e => e == null);
+    }
+
+    // CRITICAL FIX: Unsubscribe from all events on destroy
+    private void OnDestroy()
+    {
+        foreach (var kvp in _deathHandlers)
+        {
+            if (kvp.Key != null && kvp.Key.TryGetComponent<Health>(out var health))
+            {
+                health.OnDeath -= kvp.Value;
+            }
+        }
+        _deathHandlers.Clear();
     }
 
     #endregion

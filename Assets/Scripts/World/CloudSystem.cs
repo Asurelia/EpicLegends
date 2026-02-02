@@ -60,6 +60,21 @@ public class CloudSystem : MonoBehaviour
 
         _clouds = new List<CloudData>();
 
+        // Log material info for debugging
+        if (_cloudMaterial != null)
+        {
+            Debug.Log($"[CloudSystem] Using cloud material with shader: {_cloudMaterial.shader.name}");
+            if (_cloudMaterial.shader.name.Contains("pink", System.StringComparison.OrdinalIgnoreCase) ||
+                _cloudMaterial.shader.name.Contains("error", System.StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning("[CloudSystem] Material shader appears invalid (pink shader detected). Clouds may render incorrectly.");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[CloudSystem] No cloud material provided, will use URP fallback shader.");
+        }
+
         GenerateClouds();
 
         Debug.Log($"[CloudSystem] Initialized with {_cloudCount} clouds");
@@ -131,7 +146,7 @@ public class CloudSystem : MonoBehaviour
 
         // Remove collider
         var collider = cloud.GetComponent<Collider>();
-        if (collider != null) DestroyImmediate(collider);
+        if (collider != null) Destroy(collider); // CRITICAL FIX: Use Destroy() in runtime, not DestroyImmediate()
 
         cloud.transform.position = position;
         cloud.transform.localScale = scale;
@@ -142,13 +157,27 @@ public class CloudSystem : MonoBehaviour
         if (_cloudMaterial != null)
         {
             renderer.material = new Material(_cloudMaterial);
-            renderer.material.color = new Color(1f, 1f, 1f, opacity);
+            SetupTransparentMaterial(renderer.material, opacity);
         }
         else
         {
-            // Fallback material
-            renderer.material = new Material(Shader.Find("Sprites/Default"));
-            renderer.material.color = new Color(1f, 1f, 1f, opacity);
+            // Fallback: Create URP transparent material
+            Shader urpShader = Shader.Find("Universal Render Pipeline/Lit");
+            if (urpShader == null)
+            {
+                Debug.LogError("[CloudSystem] URP Lit shader not found! Clouds will be pink.");
+                urpShader = Shader.Find("Standard");
+            }
+
+            if (urpShader != null)
+            {
+                renderer.material = new Material(urpShader);
+                SetupTransparentMaterial(renderer.material, opacity);
+            }
+            else
+            {
+                Debug.LogError("[CloudSystem] No compatible shader found for clouds!");
+            }
         }
 
         // Disable shadows
@@ -171,7 +200,7 @@ public class CloudSystem : MonoBehaviour
             layer.name = $"CloudLayer_{i}";
 
             var collider = layer.GetComponent<Collider>();
-            if (collider != null) DestroyImmediate(collider);
+            if (collider != null) Destroy(collider); // CRITICAL FIX: Use Destroy() in runtime, not DestroyImmediate()
 
             layer.transform.SetParent(cloudRoot.transform);
             layer.transform.localPosition = Vector3.up * (i - layers / 2) * 2f;
@@ -183,7 +212,18 @@ public class CloudSystem : MonoBehaviour
             {
                 renderer.material = new Material(_cloudMaterial);
                 float layerOpacity = opacity * (1f - (float)i / layers * 0.5f);
-                renderer.material.color = new Color(1f, 1f, 1f, layerOpacity);
+                SetupTransparentMaterial(renderer.material, layerOpacity);
+            }
+            else
+            {
+                // Fallback for volumetric clouds
+                Shader urpShader = Shader.Find("Universal Render Pipeline/Lit");
+                if (urpShader != null)
+                {
+                    renderer.material = new Material(urpShader);
+                    float layerOpacity = opacity * (1f - (float)i / layers * 0.5f);
+                    SetupTransparentMaterial(renderer.material, layerOpacity);
+                }
             }
 
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -191,6 +231,48 @@ public class CloudSystem : MonoBehaviour
         }
 
         return cloudRoot;
+    }
+
+    /// <summary>
+    /// Configure un material pour la transparence URP.
+    /// </summary>
+    private void SetupTransparentMaterial(Material mat, float opacity)
+    {
+        if (mat == null) return;
+
+        // Configure URP transparent mode
+        if (mat.HasProperty("_Surface"))
+        {
+            mat.SetFloat("_Surface", 1); // 0 = Opaque, 1 = Transparent
+        }
+
+        if (mat.HasProperty("_Blend"))
+        {
+            mat.SetFloat("_Blend", 0); // 0 = Alpha, 1 = Premultiply, 2 = Additive, 3 = Multiply
+        }
+
+        // Enable transparency keywords
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.EnableKeyword("_ALPHAPREMULTIPLY_ON");
+
+        // Set render queue for transparency
+        mat.renderQueue = 3000; // Transparent queue
+
+        // Set color with alpha
+        if (mat.HasProperty("_BaseColor"))
+        {
+            mat.SetColor("_BaseColor", new Color(1f, 1f, 1f, opacity));
+        }
+        else if (mat.HasProperty("_Color"))
+        {
+            mat.SetColor("_Color", new Color(1f, 1f, 1f, opacity));
+        }
+        else
+        {
+            mat.color = new Color(1f, 1f, 1f, opacity);
+        }
+
+        Debug.Log($"[CloudSystem] Configured material '{mat.shader.name}' for transparency (opacity: {opacity})");
     }
 
     #endregion
@@ -206,6 +288,12 @@ public class CloudSystem : MonoBehaviour
     {
         UpdateCloudPositions();
         UpdateCloudColors();
+
+        // CRITICAL FIX: Re-cache camera if it became null (e.g., scene change)
+        if (_cameraTransform == null)
+        {
+            _cameraTransform = Camera.main?.transform;
+        }
 
         if (_useBillboards && _cameraTransform != null)
         {
@@ -272,7 +360,14 @@ public class CloudSystem : MonoBehaviour
                 {
                     Color c = currentColor;
                     c.a = cloud.Opacity;
-                    renderer.material.color = c;
+
+                    // Set color using URP property names with fallback
+                    if (renderer.material.HasProperty("_BaseColor"))
+                        renderer.material.SetColor("_BaseColor", c);
+                    else if (renderer.material.HasProperty("_Color"))
+                        renderer.material.SetColor("_Color", c);
+                    else
+                        renderer.material.color = c;
                 }
             }
         }

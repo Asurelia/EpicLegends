@@ -491,6 +491,15 @@ public class QuickSlotUI : MonoBehaviour
             _cooldownOverlay.enabled = false;
         }
     }
+
+    // CRITICAL FIX: Remove listener on destroy to prevent memory leaks
+    private void OnDestroy()
+    {
+        if (_button != null)
+        {
+            _button.onClick.RemoveAllListeners();
+        }
+    }
 }
 
 /// <summary>

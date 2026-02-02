@@ -61,6 +61,7 @@ public class EnemyAI : MonoBehaviour
 
     // Target
     private Transform _currentTarget;
+    private Transform _cachedPlayerTransform; // CRITICAL FIX: Cache player reference
     private int _currentPatrolIndex;
     private float _waitTimer;
     private float _attackTimer;
@@ -109,7 +110,17 @@ public class EnemyAI : MonoBehaviour
     {
         InitializeFromData();
         SubscribeToEvents();
+        CachePlayerReference(); // CRITICAL FIX: Cache player at Start, not in Update
         StartPatrolOrIdle();
+    }
+
+    private void CachePlayerReference()
+    {
+        var player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            _cachedPlayerTransform = player.transform;
+        }
     }
 
     private void Update()
@@ -249,13 +260,12 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
-        // Fallback: find player
-        if (_currentTarget == null)
+        // Fallback: use cached player reference (CRITICAL FIX: no FindGameObjectWithTag in Update)
+        if (_currentTarget == null && _cachedPlayerTransform != null)
         {
-            var player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null && CanSeeTarget(player.transform))
+            if (CanSeeTarget(_cachedPlayerTransform))
             {
-                _currentTarget = player.transform;
+                _currentTarget = _cachedPlayerTransform;
             }
         }
     }

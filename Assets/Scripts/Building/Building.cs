@@ -27,6 +27,9 @@ public class Building : MonoBehaviour, IDamageable
     private bool _isBuilding = false;
     private float _buildProgress = 0f;
 
+    // CRITICAL FIX: Track runtime materials for cleanup
+    private Material _runtimeMaterial;
+
     #endregion
 
     #region Events
@@ -289,7 +292,7 @@ public class Building : MonoBehaviour, IDamageable
         // TODO: Changer le mesh/materiau selon le tier
         // Pour l'instant, juste changer la couleur
         var renderer = GetComponentInChildren<Renderer>();
-        if (renderer != null)
+        if (renderer != null && renderer.material != null)
         {
             Color tierColor = _currentTier switch
             {
@@ -300,9 +303,30 @@ public class Building : MonoBehaviour, IDamageable
                 _ => Color.white
             };
 
+            // CRITICAL FIX: Destroy previous material to prevent leak
+            if (_runtimeMaterial != null)
+            {
+                Destroy(_runtimeMaterial);
+            }
+
             var mat = new Material(renderer.material);
-            mat.color = tierColor;
+            _runtimeMaterial = mat; // Track for cleanup
+            // URP uses _BaseColor, fallback to _Color for legacy
+            if (mat.HasProperty("_BaseColor"))
+                mat.SetColor("_BaseColor", tierColor);
+            else if (mat.HasProperty("_Color"))
+                mat.SetColor("_Color", tierColor);
             renderer.material = mat;
+        }
+    }
+
+    // CRITICAL FIX: Cleanup runtime material on destroy
+    private void OnDisable()
+    {
+        if (_runtimeMaterial != null)
+        {
+            Destroy(_runtimeMaterial);
+            _runtimeMaterial = null;
         }
     }
 

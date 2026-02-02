@@ -63,13 +63,44 @@ public class GameManager : MonoBehaviour
         _cancelAction?.Disable();
     }
 
+    private void OnDestroy()
+    {
+        // CRITICAL: Unsubscribe from all events to prevent memory leaks
+        if (_cancelAction != null)
+        {
+            _cancelAction.performed -= OnCancelPerformed;
+            _cancelAction.Disable();
+            _cancelAction.Dispose();
+            _cancelAction = null;
+        }
+
+        // Unsubscribe from player death event
+        if (_playerStats != null)
+        {
+            _playerStats.OnDeath -= GameOver;
+            _playerStats = null;
+        }
+
+        // Clear singleton reference
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
+    // Separate handler method for proper unsubscription
+    private void OnCancelPerformed(InputAction.CallbackContext context)
+    {
+        TogglePause();
+    }
+
     private void SetupInputActions()
     {
         // Create escape/cancel action for pause
         _cancelAction = new InputAction("Cancel", InputActionType.Button);
         _cancelAction.AddBinding("<Keyboard>/escape");
         _cancelAction.AddBinding("<Gamepad>/start");
-        _cancelAction.performed += _ => TogglePause();
+        _cancelAction.performed += OnCancelPerformed; // Use named method for proper unsubscription
         _cancelAction.Enable();
     }
 

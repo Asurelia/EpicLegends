@@ -194,7 +194,8 @@ public class Health : MonoBehaviour, IDamageable
 
     public float CurrentHealth => _currentHealth;
     public float MaxHealth => _maxHealth;
-    public float HealthPercent => _currentHealth / _maxHealth;
+    // CRITICAL FIX: Prevent division by zero
+    public float HealthPercent => _maxHealth > 0 ? _currentHealth / _maxHealth : 0f;
     public float Defense => _defense;
 
     #endregion

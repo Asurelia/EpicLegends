@@ -155,6 +155,9 @@ public class CombatController : MonoBehaviour
 
     private void OnDestroy()
     {
+        // CRITICAL FIX: Cancel all pending Invoke calls to prevent callbacks on destroyed object
+        CancelInvoke();
+
         if (_hurtbox != null)
         {
             _hurtbox.OnDamageReceived -= HandleDamageReceived;

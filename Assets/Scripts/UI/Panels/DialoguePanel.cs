@@ -73,6 +73,15 @@ public class DialoguePanel : UIPanel
             _dialogueManager.OnTextUpdated -= OnTextUpdated;
             _dialogueManager.OnChoicesDisplayed -= OnChoicesDisplayed;
         }
+
+        // CRITICAL FIX: Clean up choice button listeners
+        if (_choiceButtons != null)
+        {
+            foreach (var button in _choiceButtons)
+            {
+                if (button != null) button.onClick.RemoveAllListeners();
+            }
+        }
     }
 
     #endregion

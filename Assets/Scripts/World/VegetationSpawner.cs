@@ -141,7 +141,13 @@ public class VegetationSpawner : MonoBehaviour
 
         Vector3 position = new Vector3(worldX, worldY, worldZ);
 
-        // Get biome at position
+        // Get biome at position - with null check on singleton
+        if (BiomeManager.Instance == null)
+        {
+            Debug.LogWarning("[VegetationSpawner] BiomeManager.Instance is null - skipping vegetation spawn");
+            return;
+        }
+
         BiomeData biome = BiomeManager.Instance.GetBiomeAt(position);
         if (biome == null) return;
 

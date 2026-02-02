@@ -85,6 +85,13 @@ public class EquipmentPanel : UIPanel
         }
     }
 
+    // CRITICAL FIX: Remove listeners on destroy to prevent memory leaks
+    private void OnDestroy()
+    {
+        if (_unequipButton != null) _unequipButton.onClick.RemoveAllListeners();
+        if (_equipmentManager != null) _equipmentManager.OnStatsChanged -= RefreshDisplay;
+    }
+
     #endregion
 
     #region UIPanel Overrides
@@ -391,5 +398,11 @@ public class EquipmentSlotUI : MonoBehaviour
             // No Mythic/Unique rarity in EquipmentRarity
             _ => Color.gray
         };
+    }
+
+    // CRITICAL FIX: Remove listener on destroy
+    private void OnDestroy()
+    {
+        if (_button != null) _button.onClick.RemoveAllListeners();
     }
 }

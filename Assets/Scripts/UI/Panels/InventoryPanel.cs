@@ -65,6 +65,19 @@ public class InventoryPanel : UIPanel
         if (_filterConsumablesButton != null) _filterConsumablesButton.onClick.AddListener(() => SetFilter(ItemCategory.Consumable));
     }
 
+    // CRITICAL FIX: Remove all listeners on destroy to prevent memory leaks
+    private void OnDestroy()
+    {
+        if (_useButton != null) _useButton.onClick.RemoveAllListeners();
+        if (_equipButton != null) _equipButton.onClick.RemoveAllListeners();
+        if (_dropButton != null) _dropButton.onClick.RemoveAllListeners();
+        if (_sortButton != null) _sortButton.onClick.RemoveAllListeners();
+        if (_filterAllButton != null) _filterAllButton.onClick.RemoveAllListeners();
+        if (_filterWeaponsButton != null) _filterWeaponsButton.onClick.RemoveAllListeners();
+        if (_filterArmorButton != null) _filterArmorButton.onClick.RemoveAllListeners();
+        if (_filterConsumablesButton != null) _filterConsumablesButton.onClick.RemoveAllListeners();
+    }
+
     #endregion
 
     #region UIPanel Overrides
@@ -491,5 +504,11 @@ public class InventorySlotUI : MonoBehaviour
             ItemRarity.Mythic => Color.red,
             _ => Color.gray
         };
+    }
+
+    // CRITICAL FIX: Remove listener on destroy
+    private void OnDestroy()
+    {
+        if (_button != null) _button.onClick.RemoveAllListeners();
     }
 }

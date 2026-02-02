@@ -166,6 +166,9 @@ public class BiomeData : ScriptableObject
         foreach (var veg in vegetation)
             totalWeight += veg.weight;
 
+        // CRITICAL FIX: Prevent division by zero / ArgumentOutOfRangeException
+        if (totalWeight == 0) return null;
+
         int roll = rng.Next(0, totalWeight);
         int cumulative = 0;
 
@@ -190,6 +193,9 @@ public class BiomeData : ScriptableObject
         int totalWeight = 0;
         foreach (var prop in props)
             totalWeight += prop.weight;
+
+        // CRITICAL FIX: Prevent division by zero / ArgumentOutOfRangeException
+        if (totalWeight == 0) return null;
 
         int roll = rng.Next(0, totalWeight);
         int cumulative = 0;

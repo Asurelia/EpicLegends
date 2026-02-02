@@ -1,8 +1,9 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Mouvement simple du joueur pour les tests.
-/// Utilise les anciennes inputs pour compatibilite maximale.
+/// Utilise le nouveau Input System.
 /// </summary>
 public class SimplePlayerMovement : MonoBehaviour
 {
@@ -22,6 +23,9 @@ public class SimplePlayerMovement : MonoBehaviour
     private Rigidbody _rb;
     private bool _isGrounded;
     private Vector3 _moveDirection;
+    private Vector2 _moveInput;
+    private bool _sprintPressed;
+    private bool _jumpRequested; // CRITICAL FIX: Renamed to indicate it's a request, not a state
 
     private void Awake()
     {
@@ -53,9 +57,44 @@ public class SimplePlayerMovement : MonoBehaviour
 
     private void Update()
     {
-        // Input
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
+        // Read input using new Input System
+        var keyboard = Keyboard.current;
+        var gamepad = Gamepad.current;
+
+        if (keyboard != null)
+        {
+            // Movement WASD
+            float horizontal = 0f;
+            float vertical = 0f;
+
+            if (keyboard.wKey.isPressed) vertical += 1f;
+            if (keyboard.sKey.isPressed) vertical -= 1f;
+            if (keyboard.dKey.isPressed) horizontal += 1f;
+            if (keyboard.aKey.isPressed) horizontal -= 1f;
+
+            _moveInput = new Vector2(horizontal, vertical);
+            _sprintPressed = keyboard.leftShiftKey.isPressed;
+            // CRITICAL FIX: Use |= to not lose the input between frames before FixedUpdate
+            if (keyboard.spaceKey.wasPressedThisFrame)
+                _jumpRequested = true;
+
+            // Escape to unlock cursor
+            if (keyboard.escapeKey.wasPressedThisFrame)
+            {
+                Cursor.lockState = Cursor.lockState == CursorLockMode.Locked
+                    ? CursorLockMode.None
+                    : CursorLockMode.Locked;
+                Cursor.visible = !Cursor.visible;
+            }
+        }
+        else if (gamepad != null)
+        {
+            _moveInput = gamepad.leftStick.ReadValue();
+            _sprintPressed = gamepad.leftTrigger.isPressed;
+            // CRITICAL FIX: Use |= to not lose the input between frames before FixedUpdate
+            if (gamepad.buttonSouth.wasPressedThisFrame)
+                _jumpRequested = true;
+        }
 
         // Direction relative a la camera
         Vector3 forward = Vector3.forward;
@@ -72,35 +111,16 @@ public class SimplePlayerMovement : MonoBehaviour
         forward.Normalize();
         right.Normalize();
 
-        _moveDirection = (forward * vertical + right * horizontal).normalized;
+        _moveDirection = (forward * _moveInput.y + right * _moveInput.x).normalized;
 
-        // Sprint
-        float speed = _moveSpeed;
-        if (Input.GetKey(KeyCode.LeftShift))
-        {
-            speed *= _sprintMultiplier;
-        }
-
-        // Jump
-        if (Input.GetKeyDown(KeyCode.Space) && _isGrounded)
-        {
-            _rb.AddForce(Vector3.up * _jumpForce, ForceMode.Impulse);
-        }
+        // CRITICAL FIX: Jump is now handled in FixedUpdate (physics operation)
+        // Input is captured here but force is applied in FixedUpdate
 
         // Rotate toward movement direction
         if (_moveDirection.magnitude > 0.1f)
         {
             Quaternion targetRotation = Quaternion.LookRotation(_moveDirection);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, _rotationSpeed * Time.deltaTime);
-        }
-
-        // Escape to unlock cursor
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            Cursor.lockState = Cursor.lockState == CursorLockMode.Locked
-                ? CursorLockMode.None
-                : CursorLockMode.Locked;
-            Cursor.visible = !Cursor.visible;
         }
     }
 
@@ -109,11 +129,18 @@ public class SimplePlayerMovement : MonoBehaviour
         // Ground check
         _isGrounded = Physics.Raycast(transform.position, Vector3.down, _groundCheckDistance + 0.1f, _groundLayer);
 
+        // CRITICAL FIX: Jump (physics operation) now in FixedUpdate
+        if (_jumpRequested && _isGrounded)
+        {
+            _rb.AddForce(Vector3.up * _jumpForce, ForceMode.Impulse);
+        }
+        _jumpRequested = false; // Reset after processing
+
         // Apply movement
         if (_moveDirection.magnitude > 0.1f)
         {
             float speed = _moveSpeed;
-            if (Input.GetKey(KeyCode.LeftShift))
+            if (_sprintPressed)
             {
                 speed *= _sprintMultiplier;
             }

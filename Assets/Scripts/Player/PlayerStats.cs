@@ -217,15 +217,18 @@ public class PlayerStats : MonoBehaviour
 
     public float CurrentHealth => _currentHealth;
     public float MaxHealth => _maxHealth;
-    public float HealthPercent => _currentHealth / _maxHealth;
+    // CRITICAL FIX: Prevent division by zero
+    public float HealthPercent => _maxHealth > 0 ? _currentHealth / _maxHealth : 0f;
 
     public float CurrentMana => _currentMana;
     public float MaxMana => _maxMana;
-    public float ManaPercent => _currentMana / _maxMana;
+    // CRITICAL FIX: Prevent division by zero
+    public float ManaPercent => _maxMana > 0 ? _currentMana / _maxMana : 0f;
 
     public float CurrentStamina => _currentStamina;
     public float MaxStamina => _maxStamina;
-    public float StaminaPercent => _currentStamina / _maxStamina;
+    // CRITICAL FIX: Prevent division by zero
+    public float StaminaPercent => _maxStamina > 0 ? _currentStamina / _maxStamina : 0f;
 
     public bool IsDead => _currentHealth <= 0;
 

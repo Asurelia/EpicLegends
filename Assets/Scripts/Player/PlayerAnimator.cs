@@ -71,7 +71,9 @@ public class PlayerAnimator : MonoBehaviour
         _currentSpeed = Mathf.Lerp(_currentSpeed, targetSpeed, Time.deltaTime * 10f);
 
         // Normalize speed (0 = idle, 0.5 = walk, 1 = run)
-        float normalizedSpeed = Mathf.Clamp01(_currentSpeed / _playerController.CurrentSpeed);
+        // Avoid division by zero if CurrentSpeed is 0
+        float maxSpeed = _playerController.CurrentSpeed;
+        float normalizedSpeed = maxSpeed > 0.01f ? Mathf.Clamp01(_currentSpeed / maxSpeed) : 0f;
 
         // Update animator
         _animator.SetFloat(_speedHash, normalizedSpeed);

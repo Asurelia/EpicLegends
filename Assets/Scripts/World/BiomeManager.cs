@@ -64,21 +64,24 @@ public class BiomeManager : MonoBehaviour
         _humidityMap = GenerateNoiseMap(width, height, _humidityScale, rng.Next());
 
         // Assign biomes
+        // NOTE: Using [x, z] indexing to match Unity terrain conventions
+        // 'width' = X dimension, 'height' = Z dimension (terrain depth)
         _biomeMap = new BiomeData[width, height];
 
-        for (int y = 0; y < height; y++)
+        for (int z = 0; z < height; z++)  // z = terrain depth (was misleadingly named 'y')
         {
             for (int x = 0; x < width; x++)
             {
-                float heightValue = heightmap != null ? heightmap[x, y] : 0.5f;
-                float temperature = _temperatureMap[x, y];
-                float humidity = _humidityMap[x, y];
+                // IMPORTANT: heightmap uses [x, z] indexing to match terrain
+                float heightValue = heightmap != null ? heightmap[x, z] : 0.5f;
+                float temperature = _temperatureMap[x, z];
+                float humidity = _humidityMap[x, z];
 
-                _biomeMap[x, y] = GetBestBiome(heightValue, temperature, humidity);
+                _biomeMap[x, z] = GetBestBiome(heightValue, temperature, humidity);
             }
         }
 
-        Debug.Log($"[BiomeManager] Biome map initialized: {width}x{height}");
+        Debug.Log($"[BiomeManager] Biome map initialized: {width}x{height} (X x Z)");
     }
 
     /// <summary>
@@ -86,17 +89,19 @@ public class BiomeManager : MonoBehaviour
     /// </summary>
     public BiomeData GetBiomeAt(Vector3 worldPosition)
     {
+        // CRITICAL FIX: Check for null before accessing Length
         if (_biomeMap == null)
-            return _availableBiomes.Length > 0 ? _availableBiomes[0] : null;
+            return (_availableBiomes != null && _availableBiomes.Length > 0) ? _availableBiomes[0] : null;
 
         // Convert world position to map coordinates
+        // Using [x, z] indexing consistently
         int x = WorldToMapX(worldPosition.x);
-        int y = WorldToMapZ(worldPosition.z);
+        int z = WorldToMapZ(worldPosition.z);  // Renamed from 'y' to 'z' for clarity
 
         x = Mathf.Clamp(x, 0, _mapWidth - 1);
-        y = Mathf.Clamp(y, 0, _mapHeight - 1);
+        z = Mathf.Clamp(z, 0, _mapHeight - 1);
 
-        return _biomeMap[x, y];
+        return _biomeMap[x, z];
     }
 
     /// <summary>
@@ -180,6 +185,9 @@ public class BiomeManager : MonoBehaviour
         BiomeData bestBiome = null;
         float bestScore = 0f;
 
+        // CRITICAL FIX: Check for null before iterating
+        if (_availableBiomes == null) return null;
+
         foreach (var biome in _availableBiomes)
         {
             float score = biome.GetMatchScore(height, temperature, humidity);
@@ -190,7 +198,7 @@ public class BiomeManager : MonoBehaviour
             }
         }
 
-        // Fallback to first biome
+        // Fallback to first biome (already checked _availableBiomes != null above)
         if (bestBiome == null && _availableBiomes.Length > 0)
             bestBiome = _availableBiomes[0];
 
@@ -199,8 +207,9 @@ public class BiomeManager : MonoBehaviour
 
     private BiomeData GetBiomeAtMapCoord(int x, int y)
     {
+        // CRITICAL FIX: Check for null before accessing Length
         if (_biomeMap == null)
-            return _availableBiomes.Length > 0 ? _availableBiomes[0] : null;
+            return (_availableBiomes != null && _availableBiomes.Length > 0) ? _availableBiomes[0] : null;
 
         x = Mathf.Clamp(x, 0, _mapWidth - 1);
         y = Mathf.Clamp(y, 0, _mapHeight - 1);

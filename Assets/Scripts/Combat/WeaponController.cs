@@ -27,6 +27,9 @@ public class WeaponController : MonoBehaviour
     private float _chargeTimer;
     private bool _isCharging;
 
+    // CRITICAL FIX: Cache runtime-created ScriptableObject for proper cleanup
+    private HitboxData _runtimeHitboxData;
+
     #endregion
 
     #region Events
@@ -334,8 +337,15 @@ public class WeaponController : MonoBehaviour
     {
         if (weaponData == null || _hitbox == null) return;
 
+        // CRITICAL FIX: Destroy previous runtime instance to prevent memory leak
+        if (_runtimeHitboxData != null)
+        {
+            Destroy(_runtimeHitboxData);
+        }
+
         // Creer ou modifier les donnees de hitbox selon le type d'arme
         var hitboxData = ScriptableObject.CreateInstance<HitboxData>();
+        _runtimeHitboxData = hitboxData; // Cache for cleanup
 
         // Configurer la taille selon le type d'arme et sa portee
         switch (weaponData.weaponType)
@@ -388,6 +398,16 @@ public class WeaponController : MonoBehaviour
         hitboxData.staggerMultiplier = weaponData.staggerValue / 10f; // Normalise
 
         _hitbox.Data = hitboxData;
+    }
+
+    // CRITICAL FIX: Cleanup runtime ScriptableObject on destroy
+    private void OnDestroy()
+    {
+        if (_runtimeHitboxData != null)
+        {
+            Destroy(_runtimeHitboxData);
+            _runtimeHitboxData = null;
+        }
     }
 
     #endregion
