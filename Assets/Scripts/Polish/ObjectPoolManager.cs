@@ -28,6 +28,7 @@ public class ObjectPoolManager : MonoBehaviour
 
         _pools = new Dictionary<string, ObjectPool>();
         _pooledObjectCache = new Dictionary<GameObject, IPooledObject>();
+        _objectPoolNameCache = new Dictionary<GameObject, string>();
         InitializePools();
     }
 
@@ -64,6 +65,9 @@ public class ObjectPoolManager : MonoBehaviour
 
     // PERF FIX: Cache IPooledObject components to avoid GetComponent calls in Spawn/Return
     private Dictionary<GameObject, IPooledObject> _pooledObjectCache;
+
+    // PERF FIX: Cache pool name per object for auto-return without requiring poolName parameter
+    private Dictionary<GameObject, string> _objectPoolNameCache;
 
     #endregion
 
@@ -108,7 +112,7 @@ public class ObjectPoolManager : MonoBehaviour
         {
             config = config,
             available = new Queue<GameObject>(),
-            active = new List<GameObject>()
+            active = new HashSet<GameObject>()
         };
 
         // Pre-instancier les objets
@@ -242,8 +246,9 @@ public class ObjectPoolManager : MonoBehaviour
         while (pool.available.Count > keepCount)
         {
             var obj = pool.available.Dequeue();
-            // PERF FIX: Remove from cache before destroying
+            // PERF FIX: Remove from caches before destroying
             _pooledObjectCache?.Remove(obj);
+            _objectPoolNameCache?.Remove(obj);
             SafeDestroy(obj);
         }
 
@@ -296,6 +301,110 @@ public class ObjectPoolManager : MonoBehaviour
         return result;
     }
 
+    /// <summary>
+    /// Spawn simplifie sans position/rotation (utilise Vector3.zero et Quaternion.identity).
+    /// </summary>
+    public GameObject Spawn(string poolName)
+    {
+        return Spawn(poolName, Vector3.zero, Quaternion.identity);
+    }
+
+    /// <summary>
+    /// Spawn avec uniquement la position.
+    /// </summary>
+    public GameObject Spawn(string poolName, Vector3 position)
+    {
+        return Spawn(poolName, position, Quaternion.identity);
+    }
+
+    /// <summary>
+    /// Retourne un objet au pool sans specifier le poolName (utilise le cache).
+    /// </summary>
+    public void Return(GameObject obj)
+    {
+        if (obj == null) return;
+
+        if (_objectPoolNameCache.TryGetValue(obj, out var poolName))
+        {
+            Return(poolName, obj);
+        }
+        else
+        {
+            LogWarning($"Object not found in pool cache, destroying: {obj.name}");
+            SafeDestroy(obj);
+        }
+    }
+
+    /// <summary>
+    /// Retourne tous les objets actifs d'un pool.
+    /// </summary>
+    public void ReturnAll(string poolName)
+    {
+        if (_pools == null || !_pools.TryGetValue(poolName, out var pool)) return;
+
+        // Copy to list to avoid modifying collection during iteration
+        var activeObjects = new List<GameObject>(pool.active);
+        foreach (var obj in activeObjects)
+        {
+            Return(poolName, obj);
+        }
+
+        Log($"Returned all objects: {poolName} ({activeObjects.Count} objects)");
+    }
+
+    /// <summary>
+    /// Verifie si un pool existe.
+    /// </summary>
+    public bool HasPool(string poolName)
+    {
+        return _pools != null && _pools.ContainsKey(poolName);
+    }
+
+    /// <summary>
+    /// Detruit un pool et tous ses objets.
+    /// </summary>
+    public void DestroyPool(string poolName)
+    {
+        if (_pools == null || !_pools.TryGetValue(poolName, out var pool)) return;
+
+        // Destroy all active objects
+        foreach (var obj in pool.active)
+        {
+            _pooledObjectCache?.Remove(obj);
+            _objectPoolNameCache?.Remove(obj);
+            SafeDestroy(obj);
+        }
+
+        // Destroy all available objects
+        while (pool.available.Count > 0)
+        {
+            var obj = pool.available.Dequeue();
+            _pooledObjectCache?.Remove(obj);
+            _objectPoolNameCache?.Remove(obj);
+            SafeDestroy(obj);
+        }
+
+        _pools.Remove(poolName);
+        Log($"Pool destroyed: {poolName}");
+    }
+
+    /// <summary>
+    /// Retourne un objet apres un delai (sans poolName, utilise le cache).
+    /// </summary>
+    public void ReturnDelayed(GameObject obj, float delay)
+    {
+        if (obj == null) return;
+
+        if (_objectPoolNameCache.TryGetValue(obj, out var poolName))
+        {
+            ReturnDelayed(poolName, obj, delay);
+        }
+        else
+        {
+            LogWarning($"Object not found in pool cache for delayed return: {obj.name}");
+        }
+    }
+
     #endregion
 
     #region Private Methods
@@ -322,6 +431,9 @@ public class ObjectPoolManager : MonoBehaviour
         {
             _pooledObjectCache[obj] = pooledComponent;
         }
+
+        // Cache pool name for auto-return
+        _objectPoolNameCache[obj] = config.poolName;
 
         return obj;
     }
@@ -435,7 +547,8 @@ internal class ObjectPool
 {
     public ObjectPoolData config;
     public Queue<GameObject> available;
-    public List<GameObject> active;
+    // PERF FIX: HashSet instead of List for O(1) Remove operations
+    public HashSet<GameObject> active;
 }
 
 /// <summary>
